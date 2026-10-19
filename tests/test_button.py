@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from bleak.exc import BleakError
 import pytest
@@ -19,7 +19,9 @@ from custom_components.bluetooth_button_plus.const import (
     BUZZER_CHARACTERISTIC,
     BUZZER_OFF,
     BUZZER_ON,
+    DEFAULT_VOLUME,
     DOMAIN,
+    VOLUME_CHARACTERISTIC,
 )
 
 from . import ADDRESS, NAME, TITLE, inject, service_info
@@ -65,7 +67,11 @@ async def test_press(
     """A press connects, writes 1 or 0 and disconnects."""
     await press(hass, ON)
     connect.assert_awaited_once()
-    client.write_gatt_char.assert_awaited_once_with(BUZZER_CHARACTERISTIC, BUZZER_ON, response=True)
+    # One connection: the configured volume first, then the start
+    assert client.write_gatt_char.await_args_list == [
+        call(VOLUME_CHARACTERISTIC, bytes([DEFAULT_VOLUME]), response=True),
+        call(BUZZER_CHARACTERISTIC, BUZZER_ON, response=True),
+    ]
     client.disconnect.assert_awaited_once()
     # The retrying connection asks for the freshest device between attempts
     fresh = connect.await_args.kwargs["ble_device_callback"]()
@@ -152,7 +158,7 @@ async def test_disconnect_errors_are_ignored(
     """A failing disconnect does not turn a successful press into an error."""
     client.disconnect.side_effect = BleakError("gone")
     await press(hass, ON)
-    client.write_gatt_char.assert_awaited_once()
+    assert client.write_gatt_char.await_count == 2
 
 
 async def test_availability(
@@ -187,7 +193,7 @@ async def test_availability(
         inject(hass, service_info())
         await hass.async_block_till_done()
 
-        assert len(unavailable_callbacks) == 2
+        assert len(unavailable_callbacks) == 3
         with patch(
             "custom_components.bluetooth_button_plus.device.bluetooth.async_address_present",
             return_value=False,

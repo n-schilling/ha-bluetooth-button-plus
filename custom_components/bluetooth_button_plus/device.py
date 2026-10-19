@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from datetime import datetime
 import logging
 
 from bleak.backends.device import BLEDevice
@@ -11,15 +12,26 @@ from bleak.exc import BleakError
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 
 from homeassistant.components import bluetooth
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_call_later
 
-from .const import BUZZER_CHARACTERISTIC, BUZZER_OFF, BUZZER_ON, DOMAIN, MAX_CONNECT_ATTEMPTS
+from .const import (
+    BUZZER_CHARACTERISTIC,
+    BUZZER_OFF,
+    BUZZER_ON,
+    DEFAULT_VOLUME,
+    DOMAIN,
+    MAX_CONNECT_ATTEMPTS,
+    VOLUME_CHARACTERISTIC,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 # Words BlueZ and bleak use when a bonded connection is required but missing
 _AUTH_ERRORS = ("auth", "not permitted", "encrypt", "bond", "pair")
+
+type Write = tuple[str, bytes]
 
 
 class CannotConnect(Exception):
@@ -88,18 +100,71 @@ class BluButton:
         self.hass = hass
         self.address = address
         self.name = name
+        # The volume the buzzer starts with; the number entity restores and sets it
+        self.volume: int = DEFAULT_VOLUME
         self._lock = asyncio.Lock()
+        self._stop_timer: CALLBACK_TYPE | None = None
 
     @property
     def present(self) -> bool:
         """Return whether an adapter that can connect currently sees the button."""
         return bluetooth.async_address_present(self.hass, self.address, connectable=True)
 
-    async def async_set_buzzer(self, on: bool) -> None:
-        """Start or stop the buzzer.
+    async def async_start_buzzer(self, volume: int | None = None) -> None:
+        """Start the buzzer at the volume, or at the configured one."""
+        level = self.volume if volume is None else volume
+        await self._async_write(
+            (VOLUME_CHARACTERISTIC, bytes([level])), (BUZZER_CHARACTERISTIC, BUZZER_ON)
+        )
 
-        One connection per press, closed right after the write: the button is
-        a battery device and keeps advertising only while nothing is connected.
+    async def async_stop_buzzer(self) -> None:
+        """Stop the buzzer, and a timed stop that is still pending."""
+        self._cancel_timed_stop()
+        await self._async_write((BUZZER_CHARACTERISTIC, BUZZER_OFF))
+
+    async def async_set_volume(self, volume: int) -> None:
+        """Write the volume to the button and keep it as the configured one."""
+        await self._async_write((VOLUME_CHARACTERISTIC, bytes([volume])))
+        self.volume = volume
+
+    async def async_buzz(self, duration: float, volume: int | None = None) -> None:
+        """Start the buzzer and stop it after the duration in seconds.
+
+        The stop runs in the background: the call returns once the buzzer
+        started. A new buzz replaces a pending stop.
+        """
+        await self.async_start_buzzer(volume)
+        self._cancel_timed_stop()
+        self._stop_timer = async_call_later(self.hass, duration, self._async_timed_stop)
+
+    async def _async_timed_stop(self, _now: datetime) -> None:
+        self._stop_timer = None
+        try:
+            await self._async_write((BUZZER_CHARACTERISTIC, BUZZER_OFF))
+        except HomeAssistantError as err:
+            _LOGGER.warning(
+                "%s: the buzzer could not be stopped after the time, "
+                "it stops by itself after a minute: %s",
+                self.name,
+                err,
+            )
+
+    @callback
+    def _cancel_timed_stop(self) -> None:
+        if self._stop_timer is not None:
+            self._stop_timer()
+            self._stop_timer = None
+
+    @callback
+    def async_shutdown(self) -> None:
+        """Drop a pending timed stop; the button stops by itself after a minute."""
+        self._cancel_timed_stop()
+
+    async def _async_write(self, *writes: Write) -> None:
+        """Connect, write the values in order and disconnect.
+
+        One connection per command, closed right after the writes: the button
+        is a battery device and advertises only while nothing is connected.
         """
         async with self._lock:
             ble_device = bluetooth.async_ble_device_from_address(self.hass, self.address, True)
@@ -124,9 +189,8 @@ class BluButton:
                     translation_placeholders={"name": self.name, "error": str(err.__cause__)},
                 ) from err
             try:
-                await client.write_gatt_char(
-                    BUZZER_CHARACTERISTIC, BUZZER_ON if on else BUZZER_OFF, response=True
-                )
+                for characteristic, value in writes:
+                    await client.write_gatt_char(characteristic, value, response=True)
             except (BleakError, TimeoutError) as err:
                 raise HomeAssistantError(
                     translation_domain=DOMAIN,
@@ -135,4 +199,4 @@ class BluButton:
                 ) from err
             finally:
                 await _async_disconnect(client)
-            _LOGGER.debug("%s: buzzer %s", self.name, "on" if on else "off")
+            _LOGGER.debug("%s: wrote %s", self.name, [c[-4:] + "=" + v.hex() for c, v in writes])

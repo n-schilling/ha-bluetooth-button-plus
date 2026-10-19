@@ -1,0 +1,22 @@
+buzz:
+  target:
+    entity:
+      integration: bluetooth_button_plus
+      domain: button
+      device_class: identify
+  fields:
+    duration:
+      required: false
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: s
+    volume:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 3
+          mode: slider

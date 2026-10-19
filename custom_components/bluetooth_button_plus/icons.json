@@ -7,6 +7,16 @@
       "buzzer_off": {
         "default": "mdi:bell-off"
       }
+    },
+    "number": {
+      "volume": {
+        "default": "mdi:volume-high"
+      }
+    }
+  },
+  "services": {
+    "buzz": {
+      "service": "mdi:bell-ring"
     }
   }
 }

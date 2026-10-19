@@ -34,6 +34,11 @@
       "buzzer_off": {
         "name": "Stop buzzer"
       }
+    },
+    "number": {
+      "volume": {
+        "name": "Buzzer volume"
+      }
     }
   },
   "exceptions": {
@@ -48,6 +53,22 @@
     },
     "write_failed": {
       "message": "{name} did not accept the command: {error}"
+    }
+  },
+  "services": {
+    "buzz": {
+      "name": "Buzz",
+      "description": "Starts the buzzer and stops it after the given time.",
+      "fields": {
+        "duration": {
+          "name": "Duration",
+          "description": "Seconds until the buzzer is stopped. The button stops it by itself after a minute."
+        },
+        "volume": {
+          "name": "Volume",
+          "description": "0 off, 1 low, 2 medium, 3 high. Without it the buzzer volume of the button is used."
+        }
+      }
     }
   }
 }

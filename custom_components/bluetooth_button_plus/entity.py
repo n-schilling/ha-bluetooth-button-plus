@@ -50,6 +50,7 @@ class BluButtonEntity(Entity):
 
     async def async_added_to_hass(self) -> None:
         """Follow the button coming into and going out of range."""
+        await super().async_added_to_hass()
         self.async_on_remove(
             bluetooth.async_register_callback(
                 self.hass,

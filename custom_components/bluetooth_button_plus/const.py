@@ -18,5 +18,21 @@ BUZZER_CHARACTERISTIC: Final = "5b026510-4088-c297-46d8-be6c736a087b"
 BUZZER_ON: Final = b"\x01"
 BUZZER_OFF: Final = b"\x00"
 
+# The buzzer volume: 0 off, 1 low, 2 medium, 3 high. Bonded as well.
+VOLUME_CHARACTERISTIC: Final = "dd78bf35-7680-484e-ad86-1bc1e7738e14"
+VOLUME_MIN: Final = 0
+VOLUME_MAX: Final = 3
+# The button's factory setting
+DEFAULT_VOLUME: Final = 1
+
+# Action "buzz": start the buzzer and stop it after a time
+SERVICE_BUZZ: Final = "buzz"
+ATTR_DURATION: Final = "duration"
+ATTR_VOLUME: Final = "volume"
+DEFAULT_BUZZ_SECONDS: Final = 10
+MIN_BUZZ_SECONDS: Final = 1
+# The button stops the buzzer by itself after a minute
+MAX_BUZZ_SECONDS: Final = 60
+
 # Connection attempts before a press fails
 MAX_CONNECT_ATTEMPTS: Final = 3

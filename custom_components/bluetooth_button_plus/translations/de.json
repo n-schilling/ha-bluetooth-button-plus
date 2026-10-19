@@ -34,6 +34,11 @@
       "buzzer_off": {
         "name": "Buzzer stoppen"
       }
+    },
+    "number": {
+      "volume": {
+        "name": "Buzzer-Lautstärke"
+      }
     }
   },
   "exceptions": {
@@ -48,6 +53,22 @@
     },
     "write_failed": {
       "message": "{name} hat den Befehl nicht angenommen: {error}"
+    }
+  },
+  "services": {
+    "buzz": {
+      "name": "Piepen",
+      "description": "Startet den Buzzer und stoppt ihn nach der angegebenen Zeit.",
+      "fields": {
+        "duration": {
+          "name": "Dauer",
+          "description": "Sekunden, bis der Buzzer gestoppt wird. Von selbst stoppt der Taster ihn nach einer Minute."
+        },
+        "volume": {
+          "name": "Lautstärke",
+          "description": "0 aus, 1 leise, 2 mittel, 3 laut. Ohne Angabe gilt die Buzzer-Lautstärke des Tasters."
+        }
+      }
     }
   }
 }

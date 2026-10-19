@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from .device import BluButton
 
-PLATFORMS: list[Platform] = [Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.NUMBER]
 
 type BluButtonConfigEntry = ConfigEntry[BluButton]
 
@@ -26,4 +26,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: BluButtonConfigEntry) ->
 
 async def async_unload_entry(hass: HomeAssistant, entry: BluButtonConfigEntry) -> bool:
     """Unload a button."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        entry.runtime_data.async_shutdown()
+    return unloaded
