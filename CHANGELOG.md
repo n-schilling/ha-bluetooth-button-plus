@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-10-19
+
+### Fixed
+
+- A docstring quoted the end of a real Bluetooth address as its example; it now uses the made-up one of the tests. A privacy test keeps real addresses, e-mail addresses and network libraries out of the repository.
+
 ## [0.3.0] - 2026-10-19
 
 ### Added

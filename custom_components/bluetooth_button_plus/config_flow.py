@@ -23,7 +23,7 @@ def is_button(info: BluetoothServiceInfoBleak) -> bool:
 
 
 def title_of(info: BluetoothServiceInfoBleak) -> str:
-    """Return a title: the model and the end of the address, "SBBT-102C 31BA"."""
+    """Return a title: the model and the end of the address, "SBBT-102C EE01"."""
     return f"{info.name} {info.address.replace(':', '')[-4:].upper()}"
 
 
