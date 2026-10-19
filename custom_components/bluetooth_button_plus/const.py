@@ -29,6 +29,11 @@ DEFAULT_VOLUME: Final = 1
 SERVICE_BUZZ: Final = "buzz"
 ATTR_DURATION: Final = "duration"
 ATTR_VOLUME: Final = "volume"
+
+# The configured volume and buzz duration live in the config entry's options,
+# so they survive restarts and disabled number entities alike
+OPTION_VOLUME: Final = "volume"
+OPTION_DURATION: Final = "duration"
 DEFAULT_BUZZ_SECONDS: Final = 10
 MIN_BUZZ_SECONDS: Final = 1
 # The button stops the buzzer by itself after a minute

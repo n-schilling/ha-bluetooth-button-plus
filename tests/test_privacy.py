@@ -8,14 +8,8 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "custom_components" / "bluetooth_button_plus"
-SCANNED = [
-    *PACKAGE.rglob("*.py"),
-    *PACKAGE.rglob("*.json"),
-    *PACKAGE.rglob("*.yaml"),
-    *(ROOT / "tests").rglob("*.py"),
-    ROOT / "README.md",
-    ROOT / "CHANGELOG.md",
-]
+SKIPPED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache"}
+TEXT_SUFFIXES = {".py", ".json", ".yaml", ".yml", ".md", ".txt", ".toml", ".ini", ".sh"}
 
 MAC = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
 IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
@@ -29,18 +23,46 @@ ALLOWED_MAIL_DOMAINS = ("users.noreply.github.com", "example.com")
 # File names that merely look like an address
 NOT_MAILS = ("icon@2x.png",)
 
-# The integration speaks Bluetooth only; none of these may be imported
+# The integration speaks Bluetooth only: no network library, directly or
+# through Home Assistant's helpers
 NETWORK_MODULES = {"aiohttp", "httpx", "requests", "urllib", "socket", "http", "ssl"}
+NETWORK_PATHS = (
+    "homeassistant.helpers.aiohttp_client",
+    "homeassistant.helpers.httpx_client",
+    "homeassistant.components.http",
+    "homeassistant.components.webhook",
+    "homeassistant.components.cloud",
+)
 
 
-def _text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+def _scanned() -> list[Path]:
+    return [
+        path
+        for path in ROOT.rglob("*")
+        if path.is_file()
+        and path.suffix in TEXT_SUFFIXES
+        and not SKIPPED_DIRS & set(path.relative_to(ROOT).parts)
+    ]
+
+
+def _imports(path: Path) -> list[str]:
+    """Every imported module path, with the names of a from-import appended."""
+    names: list[str] = []
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            names.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names.append(node.module)
+            names.extend(f"{node.module}.{alias.name}" for alias in node.names)
+    return names
 
 
 def test_no_real_addresses() -> None:
-    """No Bluetooth or IP address of a real device, no personal e-mail address."""
-    for path in SCANNED:
-        text = _text(path)
+    """No Bluetooth or IP address of a real device, no personal e-mail address, anywhere."""
+    files = _scanned()
+    assert any(path.name == "ci.yaml" for path in files), "the workflow files are scanned"
+    for path in files:
+        text = path.read_text(encoding="utf-8")
         for mac in MAC.findall(text):
             assert mac.upper().startswith(ALLOWED_MAC_PREFIX), f"{path}: {mac}"
         for ip in IPV4.findall(text):
@@ -52,15 +74,9 @@ def test_no_real_addresses() -> None:
 def test_no_network_libraries() -> None:
     """Nothing is sent anywhere: the package imports no network library."""
     for path in PACKAGE.rglob("*.py"):
-        tree = ast.parse(_text(path))
-        for node in ast.walk(tree):
-            names: list[str] = []
-            if isinstance(node, ast.Import):
-                names = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                names = [node.module]
-            for name in names:
-                assert name.split(".")[0] not in NETWORK_MODULES, f"{path}: {name}"
+        for name in _imports(path):
+            assert name.split(".")[0] not in NETWORK_MODULES, f"{path}: {name}"
+            assert not name.startswith(NETWORK_PATHS), f"{path}: {name}"
 
 
 def test_no_diagnostics() -> None:

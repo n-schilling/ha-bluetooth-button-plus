@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+
 import probatio
 
-from homeassistant.components.button import ButtonEntity
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.components.button.const import ButtonDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
@@ -21,6 +24,7 @@ from .const import (
     VOLUME_MAX,
     VOLUME_MIN,
 )
+from .device import BluButton
 from .entity import BluButtonEntity
 
 PARALLEL_UPDATES = 1
@@ -35,60 +39,66 @@ BUZZ_SCHEMA: VolDictType = {
 }
 
 
+@dataclass(frozen=True, kw_only=True)
+class BluButtonButtonDescription(ButtonEntityDescription):
+    """A button and what a press does."""
+
+    press_fn: Callable[[BluButton], Awaitable[None]]
+
+
+BUTTONS: tuple[BluButtonButtonDescription, ...] = (
+    # "Buzz" is the target of the action "buzz" (device class identify), so a
+    # device as target buzzes once, not once per button
+    BluButtonButtonDescription(
+        key="buzz",
+        translation_key="buzz",
+        device_class=ButtonDeviceClass.IDENTIFY,
+        press_fn=lambda button: button.async_buzz(),
+    ),
+    BluButtonButtonDescription(
+        key="buzzer_on",
+        translation_key="buzzer_on",
+        press_fn=lambda button: button.async_start_buzzer(),
+    ),
+    BluButtonButtonDescription(
+        key="buzzer_off",
+        translation_key="buzzer_off",
+        press_fn=lambda button: button.async_stop_buzzer(),
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: BluButtonConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the buttons and the action "buzz"."""
-    # The action targets the "Buzz" button only (device class identify), so a
-    # device as target buzzes once, not once per button
     entity_platform.async_get_current_platform().async_register_entity_service(
         SERVICE_BUZZ,
         BUZZ_SCHEMA,
         "async_buzz",
         entity_device_classes=[ButtonDeviceClass.IDENTIFY],
     )
-    async_add_entities([BuzzButton(entry), BuzzerOnButton(entry), BuzzerOffButton(entry)])
+    async_add_entities(BluButtonButton(entry, description) for description in BUTTONS)
 
 
-class BuzzButton(BluButtonEntity, ButtonEntity):
-    """Buzz for the configured time at the configured volume."""
+class BluButtonButton(BluButtonEntity, ButtonEntity):
+    """A button of the Shelly BLU button."""
 
-    _attr_device_class = ButtonDeviceClass.IDENTIFY
+    entity_description: BluButtonButtonDescription
 
-    def __init__(self, entry: BluButtonConfigEntry) -> None:
+    def __init__(
+        self, entry: BluButtonConfigEntry, description: BluButtonButtonDescription
+    ) -> None:
         """Initialize the button."""
-        super().__init__(entry, "buzz")
+        super().__init__(entry, description.key)
+        self.entity_description = description
 
     async def async_press(self) -> None:
-        """Buzz for the configured time."""
-        await self._device.async_buzz()
+        """Do what the button is for."""
+        await self.entity_description.press_fn(self._device)
 
     async def async_buzz(self, duration: float | None = None, volume: int | None = None) -> None:
         """Buzz for the duration at the volume (the action "buzz")."""
         await self._device.async_buzz(duration, volume)
-
-
-class BuzzerOnButton(BluButtonEntity, ButtonEntity):
-    """Start the buzzer at the configured volume; it stops by itself after a minute."""
-
-    def __init__(self, entry: BluButtonConfigEntry) -> None:
-        """Initialize the button."""
-        super().__init__(entry, "buzzer_on")
-
-    async def async_press(self) -> None:
-        """Start the buzzer."""
-        await self._device.async_start_buzzer()
-
-
-class BuzzerOffButton(BluButtonEntity, ButtonEntity):
-    """Stop the buzzer."""
-
-    def __init__(self, entry: BluButtonConfigEntry) -> None:
-        """Initialize the button."""
-        super().__init__(entry, "buzzer_off")
-
-    async def async_press(self) -> None:
-        """Stop the buzzer."""
-        await self._device.async_stop_buzzer()

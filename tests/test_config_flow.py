@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 
 from bleak.exc import BleakError
 import pytest
@@ -13,7 +13,11 @@ from homeassistant.const import CONF_ADDRESS, CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.bluetooth_button_plus.const import BUZZER_CHARACTERISTIC, DOMAIN
+from custom_components.bluetooth_button_plus.const import (
+    BUZZER_CHARACTERISTIC,
+    DOMAIN,
+    VOLUME_CHARACTERISTIC,
+)
 
 from . import ADDRESS, NAME, OTHER_ADDRESS, TITLE, inject, service_info
 
@@ -38,7 +42,10 @@ async def test_discovery(
     assert result["data"] == {CONF_ADDRESS: ADDRESS, CONF_MODEL: NAME}
     assert result["result"].unique_id == ADDRESS
     connect.assert_awaited_once()
-    client.services.get_characteristic.assert_called_once_with(BUZZER_CHARACTERISTIC)
+    assert client.services.get_characteristic.call_args_list == [
+        call(BUZZER_CHARACTERISTIC),
+        call(VOLUME_CHARACTERISTIC),
+    ]
     client.disconnect.assert_awaited_once()
 
 
@@ -162,3 +169,27 @@ async def test_user_flow_skips_configured(
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "no_devices_found"
+
+
+async def test_user_flow_with_unknown_address(hass: HomeAssistant, bluetooth: None) -> None:
+    """A flow started with data for a button that was not offered aborts cleanly."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}, data={CONF_ADDRESS: ADDRESS}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_devices_found"
+
+
+async def test_discovery_without_volume(
+    hass: HomeAssistant, bluetooth: None, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A device with a buzzer but without the volume characteristic is refused as well."""
+    client.services.get_characteristic.side_effect = lambda uuid: (
+        None if uuid == VOLUME_CHARACTERISTIC else object()
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "not_supported"

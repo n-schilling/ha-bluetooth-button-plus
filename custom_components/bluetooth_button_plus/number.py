@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-from homeassistant.components.number import NumberDeviceClass, NumberMode, RestoreNumber
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import BluButtonConfigEntry
-from .const import MAX_BUZZ_SECONDS, MIN_BUZZ_SECONDS, VOLUME_MAX, VOLUME_MIN
-from .entity import BluButtonEntity
+from .const import (
+    MAX_BUZZ_SECONDS,
+    MIN_BUZZ_SECONDS,
+    OPTION_DURATION,
+    OPTION_VOLUME,
+    VOLUME_MAX,
+    VOLUME_MIN,
+)
+from .entity import BluButtonDeviceEntity, BluButtonEntity
 
 PARALLEL_UPDATES = 1
 
@@ -23,12 +30,12 @@ async def async_setup_entry(
     async_add_entities([BuzzerVolumeNumber(entry), BuzzDurationNumber(entry)])
 
 
-class BuzzerVolumeNumber(BluButtonEntity, RestoreNumber):
+class BuzzerVolumeNumber(BluButtonEntity, NumberEntity):
     """The volume the buzzer starts with: 0 off, 1 low, 2 medium, 3 high.
 
     The button cannot be asked for its volume without a connection, so the
-    entity holds the value Home Assistant set last and restores it after a
-    restart; every start of the buzzer writes it to the button first.
+    entity shows the value Home Assistant set last, kept in the entry's
+    options; every start of the buzzer writes it to the button first.
     """
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -46,23 +53,18 @@ class BuzzerVolumeNumber(BluButtonEntity, RestoreNumber):
         """Return the configured volume."""
         return float(self._device.volume)
 
-    async def async_added_to_hass(self) -> None:
-        """Restore the volume set before the restart."""
-        await super().async_added_to_hass()
-        last = await self.async_get_last_number_data()
-        if last is not None and last.native_value is not None:
-            self._device.volume = int(last.native_value)
-
     async def async_set_native_value(self, value: float) -> None:
-        """Write the volume to the button."""
+        """Write the volume to the button and keep it."""
         await self._device.async_set_volume(int(value))
+        self._async_save_option(OPTION_VOLUME, int(value))
         self.async_write_ha_state()
 
 
-class BuzzDurationNumber(BluButtonEntity, RestoreNumber):
+class BuzzDurationNumber(BluButtonDeviceEntity, NumberEntity):
     """The seconds a buzz lasts: for the button "Buzz" and the action without a duration.
 
-    Kept in Home Assistant only; the button has no setting for it.
+    Kept in Home Assistant only; the button has no setting for it, so it can
+    be set while the button is away.
     """
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -82,19 +84,8 @@ class BuzzDurationNumber(BluButtonEntity, RestoreNumber):
         """Return the configured duration."""
         return self._device.duration
 
-    @property
-    def available(self) -> bool:
-        """A value kept in Home Assistant: settable while the button is away."""
-        return True
-
-    async def async_added_to_hass(self) -> None:
-        """Restore the duration set before the restart."""
-        await super().async_added_to_hass()
-        last = await self.async_get_last_number_data()
-        if last is not None and last.native_value is not None:
-            self._device.duration = float(last.native_value)
-
     async def async_set_native_value(self, value: float) -> None:
         """Keep the duration."""
         self._device.duration = value
+        self._async_save_option(OPTION_DURATION, value)
         self.async_write_ha_state()

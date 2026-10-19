@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
-from bleak.exc import BleakError
+from bleak.exc import BleakDBusError, BleakError
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from homeassistant.components.bluetooth import BaseHaRemoteScanner
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
@@ -24,11 +24,13 @@ from custom_components.bluetooth_button_plus.const import (
     VOLUME_CHARACTERISTIC,
 )
 
-from . import ADDRESS, NAME, TITLE, inject, service_info
+from . import ADDRESS, NAME, TITLE, ble_device, inject, service_info
 
 ON = "button.sbbt_102c_ee01_start_buzzer"
 OFF = "button.sbbt_102c_ee01_stop_buzzer"
 BUZZ = "button.sbbt_102c_ee01_buzz"
+VOLUME = "number.sbbt_102c_ee01_buzzer_volume"
+DURATION = "number.sbbt_102c_ee01_buzz_duration"
 
 
 async def press(hass: HomeAssistant, entity_id: str) -> None:
@@ -94,10 +96,7 @@ async def test_press_out_of_range(
 ) -> None:
     """Without a connectable device the press fails and names the button."""
     with (
-        patch(
-            "custom_components.bluetooth_button_plus.device.bluetooth.async_ble_device_from_address",
-            return_value=None,
-        ),
+        patch("custom_components.bluetooth_button_plus.device._ble_device", return_value=None),
         pytest.raises(HomeAssistantError) as excinfo,
     ):
         await press(hass, ON)
@@ -106,12 +105,55 @@ async def test_press_out_of_range(
     connect.assert_not_awaited()
 
 
+async def test_prefers_the_hosts_adapter(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock
+) -> None:
+    """The host's own adapter holds the bond, so it is used even when a proxy is closer."""
+    remote = MagicMock()
+    remote.scanner = MagicMock(spec=BaseHaRemoteScanner)
+    remote.ble_device = ble_device(name="via proxy")
+    remote.advertisement.rssi = -40
+    local = MagicMock()
+    local.scanner = MagicMock()
+    local.ble_device = ble_device(name="via host")
+    local.advertisement.rssi = -70
+    with patch(
+        "custom_components.bluetooth_button_plus.device.bluetooth.async_scanner_devices_by_address",
+        return_value=[remote, local],
+    ):
+        await press(hass, ON)
+    assert connect.await_args.args[1].name == "via host"
+
+    # Only a proxy sees it: the last resort
+    with patch(
+        "custom_components.bluetooth_button_plus.device.bluetooth.async_scanner_devices_by_address",
+        return_value=[remote],
+    ):
+        await press(hass, ON)
+    assert connect.await_args.args[1].name == NAME
+
+
+def _wrapped(cause: BaseException) -> BleakError:
+    """An error as bleak-retry-connector raises it: the button's name in the text, the cause behind."""
+    err = BleakError(f"Repair-Tag - {ADDRESS}: Failed to connect after 3 attempt(s): {cause}")
+    err.__cause__ = cause
+    return err
+
+
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
         (BleakError("le-connection-abort-by-local"), "cannot_connect"),
         (TimeoutError(), "cannot_connect"),
         (BleakError("Insufficient authentication"), "not_paired"),
+        (BleakDBusError("org.bluez.Error.NotPermitted", []), "not_paired"),
+        (
+            BleakDBusError("org.bluez.Error.Failed", ["le-connection-abort-by-local"]),
+            "cannot_connect",
+        ),
+        # The wrapper's text names the button ("Repair-Tag"), only the cause counts
+        (_wrapped(BleakError("le-connection-abort-by-local")), "cannot_connect"),
+        (_wrapped(BleakDBusError("org.bluez.Error.NotAuthorized", [])), "not_paired"),
     ],
 )
 async def test_press_cannot_connect(
@@ -134,6 +176,7 @@ async def test_press_cannot_connect(
     ("error", "expected"),
     [
         (BleakError("Not permitted"), "not_paired"),
+        (BleakDBusError("org.bluez.Error.NotPermitted", ["Write not permitted"]), "not_paired"),
         (BleakError("boom"), "write_failed"),
         (TimeoutError(), "write_failed"),
     ],
@@ -165,47 +208,37 @@ async def test_disconnect_errors_are_ignored(
 async def test_availability(
     hass: HomeAssistant, bluetooth: None, connect: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
-    """The buttons follow the button coming into and going out of range."""
-    unavailable_callbacks: list[Callable[..., None]] = []
-
-    def _track(
-        hass_: HomeAssistant, callback: Callable[..., None], *_: object, **__: object
-    ) -> Callable[[], None]:
-        unavailable_callbacks.append(callback)
-        return lambda: None
-
-    with patch(
-        "custom_components.bluetooth_button_plus.entity.bluetooth.async_track_unavailable", _track
-    ):
-        config_entry.add_to_hass(hass)
-        assert await hass.config_entries.async_setup(config_entry.entry_id)
-        await hass.async_block_till_done()
-        state = hass.states.get(ON)
+    """The buttons follow the button coming into and going out of range; the duration stays."""
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    for entity_id in (ON, OFF, BUZZ, VOLUME):
+        state = hass.states.get(entity_id)
         assert state is not None
-        assert state.state == STATE_UNAVAILABLE
+        assert state.state == STATE_UNAVAILABLE, entity_id
+    state = hass.states.get(DURATION)
+    assert state is not None
+    assert state.state != STATE_UNAVAILABLE
 
-        inject(hass, service_info())
-        await hass.async_block_till_done()
-        state = hass.states.get(ON)
+    inject(hass, service_info())
+    await hass.async_block_till_done()
+    for entity_id in (ON, OFF, BUZZ, VOLUME):
+        state = hass.states.get(entity_id)
         assert state is not None
-        assert state.state != STATE_UNAVAILABLE
+        assert state.state != STATE_UNAVAILABLE, entity_id
 
-        # Another advertisement changes nothing
-        inject(hass, service_info())
-        await hass.async_block_till_done()
+    # Home Assistant's Bluetooth manager reports the button gone
+    config_entry.runtime_data.coordinator._async_handle_unavailable(service_info())
+    await hass.async_block_till_done()
+    for entity_id in (ON, OFF, BUZZ, VOLUME):
+        state = hass.states.get(entity_id)
+        assert state is not None
+        assert state.state == STATE_UNAVAILABLE, entity_id
+    state = hass.states.get(DURATION)
+    assert state is not None
+    assert state.state != STATE_UNAVAILABLE
 
-        assert len(unavailable_callbacks) == 5
-        with patch(
-            "custom_components.bluetooth_button_plus.device.bluetooth.async_address_present",
-            return_value=False,
-        ):
-            for callback in unavailable_callbacks:
-                callback(service_info())
-            await hass.async_block_till_done()
-            state = hass.states.get(OFF)
-            assert state is not None
-            assert state.state == STATE_UNAVAILABLE
-
-        assert await hass.config_entries.async_unload(config_entry.entry_id)
-        await hass.async_block_till_done()
-        assert hass.states.get(ON) is None or hass.states.get(ON).state == STATE_UNAVAILABLE
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get(ON)
+    assert state is None or state.state == STATE_UNAVAILABLE

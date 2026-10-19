@@ -26,10 +26,10 @@ The buzzer characteristic is documented for the BLU Button1 and the BLU Button T
 ## Requirements
 
 - Home Assistant 2026.10 or newer.
-- A Bluetooth adapter that can **connect**: the adapter of the Home Assistant machine, or an [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html) with active connections. Shelly devices as Bluetooth proxies only forward advertisements, they cannot connect, so a button seen only through a Shelly proxy stays *unavailable* here.
+- The Bluetooth adapter of the Home Assistant machine, in range of the button. The bond lives in the Bluetooth stack of that machine, so only its own adapter can write to the button; the integration prefers it whenever several adapters see the button. Bluetooth proxies do not help: Shelly devices as proxies only forward advertisements and cannot connect, and an [ESPHome proxy](https://esphome.io/components/bluetooth_proxy.html) has no way to pair with the button, so a connection through it is refused.
 - The button paired with that adapter, see below.
 
-The buttons are available only while an adapter that can connect sees the button. Out of range, they are *unavailable*; a press then fails with a message that says so.
+The buttons and the volume are available only while an adapter that can connect sees the button. Out of range, they are *unavailable*, and Home Assistant skips a press or the action for an unavailable entity: an automation goes on, and the log notes that the entity is unavailable. Only in the short gap between the last advertisement and the moment Home Assistant marks the button unavailable does a press fail with a message of its own.
 
 ## Pairing
 
@@ -69,9 +69,9 @@ During setup the integration connects once to the button. That checks the pairin
 | Start buzzer (`button`) | Connects, writes the buzzer volume, starts the buzzer and disconnects. The button stops the buzzer by itself after a minute. |
 | Stop buzzer (`button`) | Stops the buzzer before that, and drops a pending stop of the action `buzz`. |
 | Buzz duration (`number`, configuration) | Seconds the *Buzz* button and the action without `duration` buzz, 1–60 (default 10). Kept in Home Assistant, the button has no such setting, so it can be set while the button is away. |
-| Buzzer volume (`number`, configuration) | 0 off, 1 low, 2 medium, 3 high. Written to the button when set, restored after a restart, and applied before every start of the buzzer. The button cannot be asked for its volume without a connection, so a volume changed in the Shelly app is not shown here; it is overwritten at the next start. |
+| Buzzer volume (`number`, configuration) | 0 off, 1 low, 2 medium, 3 high. Written to the button when set and applied before every start of the buzzer. The button cannot be asked for its volume without a connection, so a volume changed in the Shelly app is not shown here; it is overwritten at the next start. |
 
-All but *Buzz duration* are *unavailable* while no adapter that can connect sees the button.
+Both settings are kept in the integration's configuration, so they survive a restart and a disabled entity. All entities but *Buzz duration* are *unavailable* while no adapter that can connect sees the button.
 
 ## Action
 
@@ -100,7 +100,7 @@ sequence:
 
 ## Limitations
 
-- Range: only the adapter that is bonded with the button can trigger the buzzer, and only while it sees the button. Bluetooth proxies that merely forward advertisements do not help.
+- Range: only the adapter that is bonded with the button can trigger the buzzer, and only while it sees the button. Bluetooth proxies do not help, see [Requirements](#requirements).
 - The bond lives in BlueZ on the host. A new Bluetooth adapter, or a reinstalled host, needs a new pairing.
 - Nothing is read from the button; its presses and its battery come from BTHome, its position from Bermuda. The volume is the value Home Assistant set last, not the button's.
 

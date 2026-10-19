@@ -73,7 +73,9 @@ class BluetoothButtonPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick one of the buttons an adapter sees."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            info = self._discovered[user_input[CONF_ADDRESS]]
+            if (info := self._discovered.get(user_input[CONF_ADDRESS])) is None:
+                # Not one of the buttons that were offered (a flow started with data)
+                return self.async_abort(reason="no_devices_found")
             await self.async_set_unique_id(info.address, raise_on_progress=False)
             self._abort_if_unique_id_configured()
             if (result := await self._async_finish(info, errors)) is not None:

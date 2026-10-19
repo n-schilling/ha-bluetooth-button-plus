@@ -23,7 +23,7 @@
       "already_configured": "Dieser Taster ist schon eingerichtet.",
       "already_in_progress": "Dieser Taster wird gerade eingerichtet.",
       "no_devices_found": "Kein Shelly BLU Taster in Reichweite eines Adapters, der Verbindungen aufbauen kann.",
-      "not_supported": "Dieses Gerät hat keinen Buzzer."
+      "not_supported": "Dieses Gerät hat keinen Buzzer mit Lautstärke."
     }
   },
   "entity": {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 import logging
 from unittest.mock import AsyncMock, MagicMock, call
@@ -195,3 +196,103 @@ async def test_unload_drops_the_timed_stop(
     await hass.async_block_till_done()
     await elapse(hass, 6)
     assert connect.await_count == 1
+
+
+async def test_timed_stop_overtaken_by_a_new_buzz(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A stop that falls due while a new buzz is being written does not cut the new buzz."""
+    gate = asyncio.Event()
+    gate.set()
+    entered = asyncio.Event()
+
+    async def write(*_args: object, **_kwargs: object) -> None:
+        entered.set()
+        await gate.wait()
+
+    client.write_gatt_char = AsyncMock(side_effect=write)
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 5})
+
+    # The second buzz holds the lock while its write hangs
+    gate.clear()
+    entered.clear()
+    second = hass.async_create_task(entry.runtime_data.button.async_buzz(5))
+    await entered.wait()
+    # The first stop falls due and waits for the lock
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=6))
+    await asyncio.sleep(0)
+    gate.set()
+    await second
+    await hass.async_block_till_done()
+    assert not any(call.args[1] == BUZZER_OFF for call in client.write_gatt_char.await_args_list), (
+        "the overtaken stop wrote OFF"
+    )
+
+    # The second buzz keeps its own stop
+    await elapse(hass, 12)
+    assert client.write_gatt_char.await_args_list[-1].args[1] == BUZZER_OFF
+    assert sum(1 for c in client.write_gatt_char.await_args_list if c.args[1] == BUZZER_OFF) == 1
+
+
+async def test_stop_pressed_while_a_buzz_starts(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """Stop pressed during a hanging start wins: the buzz's stop is dropped, OFF is written once."""
+    gate = asyncio.Event()
+    entered = asyncio.Event()
+
+    async def write(*_args: object, **_kwargs: object) -> None:
+        entered.set()
+        await gate.wait()
+
+    client.write_gatt_char = AsyncMock(side_effect=write)
+    first = hass.async_create_task(entry.runtime_data.button.async_buzz(5))
+    await entered.wait()
+    stop = hass.async_create_task(entry.runtime_data.button.async_stop_buzzer())
+    await asyncio.sleep(0)
+    gate.set()
+    await first
+    await stop
+    await hass.async_block_till_done()
+    assert client.write_gatt_char.await_args_list[-1].args[1] == BUZZER_OFF
+    await elapse(hass, 6)
+    assert sum(1 for c in client.write_gatt_char.await_args_list if c.args[1] == BUZZER_OFF) == 1
+
+
+async def test_stop_task_overtaken_by_a_queued_buzz(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A stop queued behind a new buzz at the lock finds a newer generation and steps aside.
+
+    A volume write holds the lock; a new buzz queues up behind it; then the
+    first buzz's stop falls due and queues up behind the new buzz.
+    """
+    gate = asyncio.Event()
+    gate.set()
+    entered = asyncio.Event()
+
+    async def write(*_args: object, **_kwargs: object) -> None:
+        entered.set()
+        await gate.wait()
+
+    client.write_gatt_char = AsyncMock(side_effect=write)
+    button = entry.runtime_data.button
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 5})
+
+    gate.clear()
+    entered.clear()
+    holder = hass.async_create_task(button.async_set_volume(2))
+    await entered.wait()
+    second = hass.async_create_task(button.async_buzz(5))
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=6))
+    await asyncio.sleep(0)
+    gate.set()
+    await holder
+    await second
+    await hass.async_block_till_done()
+    assert not any(call.args[1] == BUZZER_OFF for call in client.write_gatt_char.await_args_list)
+    assert connect.await_count == 3
+
+    await elapse(hass, 12)
+    assert client.write_gatt_char.await_args_list[-1].args[1] == BUZZER_OFF
+    assert connect.await_count == 4

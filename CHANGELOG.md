@@ -2,6 +2,24 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-10-19
+
+### Fixed
+
+- A timed stop that fell due while a new buzz was being written no longer cuts the new buzz short, and a stop pressed during a start wins: every command runs under one lock and a stale timed stop steps aside.
+- The setup checks the volume characteristic as well, so a button that passes the setup can always buzz.
+- A flow started with data for a button that was not offered aborts cleanly instead of failing with an internal error.
+- "Not paired" is recognized from the Bluetooth error itself (the BlueZ error code or the original error's text), no longer from a text that carries the button's name.
+- The HACS check in CI is skipped for every event without a repository object, not only for pushes.
+
+### Changed
+
+- The buzzer volume and the buzz duration are kept in the integration's settings (config entry options) instead of the entities' restored state: they survive a restart and a disabled entity.
+- The host's own Bluetooth adapter is preferred for the connection, since it holds the bond; a proxy is the last resort.
+- Entities use Home Assistant's passive Bluetooth coordinator for their availability: one pair of Bluetooth callbacks per button instead of one per entity. The buzz duration, kept in Home Assistant, no longer follows the button's range.
+- The buttons are described by one table; the German translation is checked against strings.json; the privacy test scans the whole repository and the full import paths.
+- README: what happens with a press out of range, and why Bluetooth proxies cannot help.
+
 ## [0.3.2] - 2026-10-19
 
 ### Added

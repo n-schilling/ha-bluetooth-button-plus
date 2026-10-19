@@ -23,7 +23,7 @@
       "already_configured": "This button is already set up.",
       "already_in_progress": "This button is already being set up.",
       "no_devices_found": "No Shelly BLU button in range of an adapter that can connect.",
-      "not_supported": "This device has no buzzer."
+      "not_supported": "This device has no buzzer with a volume."
     }
   },
   "entity": {
