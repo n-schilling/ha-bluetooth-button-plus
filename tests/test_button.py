@@ -28,6 +28,7 @@ from . import ADDRESS, NAME, TITLE, inject, service_info
 
 ON = "button.sbbt_102c_ee01_start_buzzer"
 OFF = "button.sbbt_102c_ee01_stop_buzzer"
+BUZZ = "button.sbbt_102c_ee01_buzz"
 
 
 async def press(hass: HomeAssistant, entity_id: str) -> None:
@@ -43,8 +44,8 @@ async def test_entities_and_device(
     device_registry: dr.DeviceRegistry,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Two buttons on one device that carries the Bluetooth address."""
-    for entity_id, key in ((ON, "buzzer_on"), (OFF, "buzzer_off")):
+    """Three buttons on one device that carries the Bluetooth address."""
+    for entity_id, key in ((BUZZ, "buzz"), (ON, "buzzer_on"), (OFF, "buzzer_off")):
         state = hass.states.get(entity_id)
         assert state is not None
         assert state.state != STATE_UNAVAILABLE
@@ -193,7 +194,7 @@ async def test_availability(
         inject(hass, service_info())
         await hass.async_block_till_done()
 
-        assert len(unavailable_callbacks) == 3
+        assert len(unavailable_callbacks) == 5
         with patch(
             "custom_components.bluetooth_button_plus.device.bluetooth.async_address_present",
             return_value=False,

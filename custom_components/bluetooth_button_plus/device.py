@@ -20,6 +20,7 @@ from .const import (
     BUZZER_CHARACTERISTIC,
     BUZZER_OFF,
     BUZZER_ON,
+    DEFAULT_BUZZ_SECONDS,
     DEFAULT_VOLUME,
     DOMAIN,
     MAX_CONNECT_ATTEMPTS,
@@ -100,8 +101,10 @@ class BluButton:
         self.hass = hass
         self.address = address
         self.name = name
-        # The volume the buzzer starts with; the number entity restores and sets it
+        # The volume the buzzer starts with and the seconds a buzz lasts; the
+        # number entities restore and set them
         self.volume: int = DEFAULT_VOLUME
+        self.duration: float = DEFAULT_BUZZ_SECONDS
         self._lock = asyncio.Lock()
         self._stop_timer: CALLBACK_TYPE | None = None
 
@@ -127,15 +130,18 @@ class BluButton:
         await self._async_write((VOLUME_CHARACTERISTIC, bytes([volume])))
         self.volume = volume
 
-    async def async_buzz(self, duration: float, volume: int | None = None) -> None:
+    async def async_buzz(self, duration: float | None = None, volume: int | None = None) -> None:
         """Start the buzzer and stop it after the duration in seconds.
 
-        The stop runs in the background: the call returns once the buzzer
-        started. A new buzz replaces a pending stop.
+        Without a duration or a volume the configured ones are used. The stop
+        runs in the background: the call returns once the buzzer started. A
+        new buzz replaces a pending stop.
         """
         await self.async_start_buzzer(volume)
         self._cancel_timed_stop()
-        self._stop_timer = async_call_later(self.hass, duration, self._async_timed_stop)
+        self._stop_timer = async_call_later(
+            self.hass, self.duration if duration is None else duration, self._async_timed_stop
+        )
 
     async def _async_timed_stop(self, _now: datetime) -> None:
         self._stop_timer = None

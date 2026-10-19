@@ -1,4 +1,4 @@
-"""Buttons: start and stop the buzzer; the action "buzz" with a duration."""
+"""Buttons: buzz for the configured time, start and stop the buzzer; the action "buzz"."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from . import BluButtonConfigEntry
 from .const import (
     ATTR_DURATION,
     ATTR_VOLUME,
-    DEFAULT_BUZZ_SECONDS,
     MAX_BUZZ_SECONDS,
     MIN_BUZZ_SECONDS,
     SERVICE_BUZZ,
@@ -27,7 +26,7 @@ from .entity import BluButtonEntity
 PARALLEL_UPDATES = 1
 
 BUZZ_SCHEMA: VolDictType = {
-    probatio.Optional(ATTR_DURATION, default=DEFAULT_BUZZ_SECONDS): probatio.All(
+    probatio.Optional(ATTR_DURATION): probatio.All(
         probatio.Coerce(float), probatio.Range(min=MIN_BUZZ_SECONDS, max=MAX_BUZZ_SECONDS)
     ),
     probatio.Optional(ATTR_VOLUME): probatio.All(
@@ -42,21 +41,37 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the buttons and the action "buzz"."""
-    # The action targets the "Start buzzer" button only (device class identify),
-    # so a device as target buzzes once, not once per button
+    # The action targets the "Buzz" button only (device class identify), so a
+    # device as target buzzes once, not once per button
     entity_platform.async_get_current_platform().async_register_entity_service(
         SERVICE_BUZZ,
         BUZZ_SCHEMA,
         "async_buzz",
         entity_device_classes=[ButtonDeviceClass.IDENTIFY],
     )
-    async_add_entities([BuzzerOnButton(entry), BuzzerOffButton(entry)])
+    async_add_entities([BuzzButton(entry), BuzzerOnButton(entry), BuzzerOffButton(entry)])
+
+
+class BuzzButton(BluButtonEntity, ButtonEntity):
+    """Buzz for the configured time at the configured volume."""
+
+    _attr_device_class = ButtonDeviceClass.IDENTIFY
+
+    def __init__(self, entry: BluButtonConfigEntry) -> None:
+        """Initialize the button."""
+        super().__init__(entry, "buzz")
+
+    async def async_press(self) -> None:
+        """Buzz for the configured time."""
+        await self._device.async_buzz()
+
+    async def async_buzz(self, duration: float | None = None, volume: int | None = None) -> None:
+        """Buzz for the duration at the volume (the action "buzz")."""
+        await self._device.async_buzz(duration, volume)
 
 
 class BuzzerOnButton(BluButtonEntity, ButtonEntity):
     """Start the buzzer at the configured volume; it stops by itself after a minute."""
-
-    _attr_device_class = ButtonDeviceClass.IDENTIFY
 
     def __init__(self, entry: BluButtonConfigEntry) -> None:
         """Initialize the button."""
@@ -65,10 +80,6 @@ class BuzzerOnButton(BluButtonEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Start the buzzer."""
         await self._device.async_start_buzzer()
-
-    async def async_buzz(self, duration: float, volume: int | None = None) -> None:
-        """Start the buzzer and stop it after the duration (the action "buzz")."""
-        await self._device.async_buzz(duration, volume)
 
 
 class BuzzerOffButton(BluButtonEntity, ButtonEntity):

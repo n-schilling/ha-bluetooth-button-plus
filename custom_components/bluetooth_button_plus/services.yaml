@@ -7,7 +7,6 @@ buzz:
   fields:
     duration:
       required: false
-      default: 10
       selector:
         number:
           min: 1

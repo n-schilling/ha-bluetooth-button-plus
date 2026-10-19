@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-19
+
+### Added
+
+- Button *Buzz*: buzzes for the configured time at the configured volume, for dashboards and the device page.
+- Number *Buzz duration* (1–60 s, default 10, kept in Home Assistant) per button.
+
+### Changed
+
+- The action `bluetooth_button_plus.buzz` targets the *Buzz* button (or its device) and, without `duration`, uses the buzz duration of the button.
+
 ## [0.2.0] - 2026-10-19
 
 ### Added

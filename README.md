@@ -4,7 +4,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![HACS: custom](https://img.shields.io/badge/HACS-custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
 
-A custom integration that puts the buzzer of a Shelly BLU button into Home Assistant: the buttons *Start buzzer* and *Stop buzzer*, the number *Buzzer volume*, and the action `buzz` that buzzes for a number of seconds. Useful to find a button that is attached to something that wanders, such as a dog's harness or a key ring.
+A custom integration that puts the buzzer of a Shelly BLU button into Home Assistant: the button *Buzz* that buzzes for a number of seconds, *Start buzzer* and *Stop buzzer*, the numbers *Buzzer volume* and *Buzz duration*, and the action `buzz`. Useful to find a button that is attached to something that wanders, such as a dog's harness or a key ring.
 
 It complements the integrations that already read the button: [BTHome](https://www.home-assistant.io/integrations/bthome/) for the presses and the battery, [Bermuda](https://github.com/agittins/bermuda) for the room and the distance. Neither of them writes to the button; this one does nothing else. This project is not affiliated with or endorsed by Shelly.
 
@@ -65,11 +65,13 @@ During setup the integration connects once to the button. That checks the pairin
 
 | Entity | Description |
 |---|---|
+| Buzz (`button`) | Buzzes for the *Buzz duration* at the *Buzzer volume*: connects, writes the volume and the 1, disconnects, and stops the buzzer after the time in the background. |
 | Start buzzer (`button`) | Connects, writes the buzzer volume, starts the buzzer and disconnects. The button stops the buzzer by itself after a minute. |
 | Stop buzzer (`button`) | Stops the buzzer before that, and drops a pending stop of the action `buzz`. |
+| Buzz duration (`number`, configuration) | Seconds the *Buzz* button and the action without `duration` buzz, 1–60 (default 10). Kept in Home Assistant, the button has no such setting, so it can be set while the button is away. |
 | Buzzer volume (`number`, configuration) | 0 off, 1 low, 2 medium, 3 high. Written to the button when set, restored after a restart, and applied before every start of the buzzer. The button cannot be asked for its volume without a connection, so a volume changed in the Shelly app is not shown here; it is overwritten at the next start. |
 
-All are *unavailable* while no adapter that can connect sees the button.
+All but *Buzz duration* are *unavailable* while no adapter that can connect sees the button.
 
 ## Action
 
@@ -77,10 +79,10 @@ All are *unavailable* while no adapter that can connect sees the button.
 
 | Field | Default | Description |
 |---|---|---|
-| `duration` | 10 | Seconds until the buzzer is stopped, 1–60. |
+| `duration` | the buzz duration | Seconds until the buzzer is stopped, 1–60, for this one buzz only. |
 | `volume` | the buzzer volume | 0–3 for this one buzz only. |
 
-Target: the *Start buzzer* button, or its device.
+Target: the *Buzz* button, or its device.
 
 ## Example
 
@@ -90,7 +92,7 @@ A script that makes the button buzz loudly for five seconds:
 sequence:
   - action: bluetooth_button_plus.buzz
     target:
-      entity_id: button.sbbt_102c_ee01_start_buzzer
+      entity_id: button.sbbt_102c_ee01_buzz
     data:
       duration: 5
       volume: 3

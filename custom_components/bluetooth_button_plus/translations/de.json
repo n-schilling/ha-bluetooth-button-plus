@@ -28,6 +28,9 @@
   },
   "entity": {
     "button": {
+      "buzz": {
+        "name": "Piepen"
+      },
       "buzzer_on": {
         "name": "Buzzer starten"
       },
@@ -38,6 +41,9 @@
     "number": {
       "volume": {
         "name": "Buzzer-Lautstärke"
+      },
+      "duration": {
+        "name": "Piep-Dauer"
       }
     }
   },
@@ -62,7 +68,7 @@
       "fields": {
         "duration": {
           "name": "Dauer",
-          "description": "Sekunden, bis der Buzzer gestoppt wird. Von selbst stoppt der Taster ihn nach einer Minute."
+          "description": "Sekunden, bis der Buzzer gestoppt wird. Ohne Angabe gilt die Piep-Dauer des Tasters; von selbst stoppt der Taster ihn nach einer Minute."
         },
         "volume": {
           "name": "Lautstärke",

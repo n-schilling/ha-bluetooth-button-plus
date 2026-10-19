@@ -27,6 +27,7 @@ from custom_components.bluetooth_button_plus.const import (
 from . import inject, service_info
 
 VOLUME = "number.sbbt_102c_ee01_buzzer_volume"
+DURATION = "number.sbbt_102c_ee01_buzz_duration"
 ON = "button.sbbt_102c_ee01_start_buzzer"
 
 
@@ -113,16 +114,61 @@ async def test_volume_restored(
     connect.assert_not_awaited()
 
 
-async def test_volume_unavailable_out_of_range(
+async def test_out_of_range(
     hass: HomeAssistant, bluetooth: None, connect: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
-    """Out of range the volume cannot be set."""
+    """Out of range the volume cannot be set; the duration lives in Home Assistant and can."""
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
     state = hass.states.get(VOLUME)
     assert state is not None
     assert state.state == STATE_UNAVAILABLE
+    state = hass.states.get(DURATION)
+    assert state is not None
+    assert float(state.state) == 10
+    assert state.attributes["unit_of_measurement"] == "s"
+    assert state.attributes["device_class"] == "duration"
+    assert state.attributes["min"] == 1
+    assert state.attributes["max"] == 60
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        SERVICE_SET_VALUE,
+        {ATTR_ENTITY_ID: DURATION, ATTR_VALUE: 42},
+        blocking=True,
+    )
+    state = hass.states.get(DURATION)
+    assert state is not None
+    assert float(state.state) == 42
+    connect.assert_not_awaited()
+
+
+async def test_duration_restored(
+    hass: HomeAssistant, bluetooth: None, config_entry: MockConfigEntry
+) -> None:
+    """After a restart the duration set before is used again."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(DURATION, "7.0"),
+                {
+                    "native_max_value": 60,
+                    "native_min_value": 1,
+                    "native_step": 1,
+                    "native_unit_of_measurement": "s",
+                    "native_value": 7.0,
+                },
+            )
+        ],
+    )
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get(DURATION)
+    assert state is not None
+    assert float(state.state) == 7
+    assert config_entry.runtime_data.duration == 7.0
 
 
 async def test_translations_load(hass: HomeAssistant) -> None:

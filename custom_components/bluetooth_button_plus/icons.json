@@ -1,8 +1,11 @@
 {
   "entity": {
     "button": {
-      "buzzer_on": {
+      "buzz": {
         "default": "mdi:bell-ring"
+      },
+      "buzzer_on": {
+        "default": "mdi:bell"
       },
       "buzzer_off": {
         "default": "mdi:bell-off"
@@ -11,6 +14,9 @@
     "number": {
       "volume": {
         "default": "mdi:volume-high"
+      },
+      "duration": {
+        "default": "mdi:timer-outline"
       }
     }
   },

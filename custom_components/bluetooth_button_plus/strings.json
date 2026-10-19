@@ -28,6 +28,9 @@
   },
   "entity": {
     "button": {
+      "buzz": {
+        "name": "Buzz"
+      },
       "buzzer_on": {
         "name": "Start buzzer"
       },
@@ -38,6 +41,9 @@
     "number": {
       "volume": {
         "name": "Buzzer volume"
+      },
+      "duration": {
+        "name": "Buzz duration"
       }
     }
   },
@@ -62,7 +68,7 @@
       "fields": {
         "duration": {
           "name": "Duration",
-          "description": "Seconds until the buzzer is stopped. The button stops it by itself after a minute."
+          "description": "Seconds until the buzzer is stopped. Without it the buzz duration of the button is used; the button stops the buzzer by itself after a minute."
         },
         "volume": {
           "name": "Volume",

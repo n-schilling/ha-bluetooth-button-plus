@@ -11,6 +11,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
+from homeassistant.components.number import ATTR_VALUE, DOMAIN as NUMBER_DOMAIN, SERVICE_SET_VALUE
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceNotSupported
@@ -30,8 +31,10 @@ from custom_components.bluetooth_button_plus.const import (
 
 from . import ADDRESS
 
+BUZZ = "button.sbbt_102c_ee01_buzz"
 ON = "button.sbbt_102c_ee01_start_buzzer"
 OFF = "button.sbbt_102c_ee01_stop_buzzer"
+DURATION = "number.sbbt_102c_ee01_buzz_duration"
 
 
 async def buzz(hass: HomeAssistant, target: dict[str, str], **data: float) -> None:
@@ -49,7 +52,7 @@ async def test_buzz(
     hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
 ) -> None:
     """The buzzer starts at once and stops after the duration."""
-    await buzz(hass, {ATTR_ENTITY_ID: ON}, **{ATTR_DURATION: 5, ATTR_VOLUME: 2})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 5, ATTR_VOLUME: 2})
     connect.assert_awaited_once()
     assert client.write_gatt_char.await_args_list == [
         call(VOLUME_CHARACTERISTIC, b"\x02", response=True),
@@ -69,7 +72,7 @@ async def test_buzz_defaults(
     hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
 ) -> None:
     """Without fields: ten seconds at the configured volume."""
-    await buzz(hass, {ATTR_ENTITY_ID: ON})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ})
     assert client.write_gatt_char.await_args_list[0] == call(
         VOLUME_CHARACTERISTIC, b"\x01", response=True
     )
@@ -94,17 +97,58 @@ async def test_buzz_targets_the_device_once(
     connect.assert_awaited_once()
 
 
-async def test_buzz_refuses_the_stop_button(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    """The stop button named directly is no target for the action."""
+@pytest.mark.parametrize("entity_id", [ON, OFF])
+async def test_buzz_refuses_the_other_buttons(
+    hass: HomeAssistant, entry: MockConfigEntry, entity_id: str
+) -> None:
+    """Start and stop named directly are no targets for the action."""
     with pytest.raises(ServiceNotSupported):
-        await buzz(hass, {ATTR_ENTITY_ID: OFF}, **{ATTR_DURATION: 1})
+        await buzz(hass, {ATTR_ENTITY_ID: entity_id}, **{ATTR_DURATION: 1})
+
+
+async def test_buzz_button(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """The button "Buzz" buzzes for the configured duration at the configured volume."""
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        SERVICE_SET_VALUE,
+        {ATTR_ENTITY_ID: DURATION, ATTR_VALUE: 3},
+        blocking=True,
+    )
+    connect.assert_not_awaited()
+    state = hass.states.get(DURATION)
+    assert state is not None
+    assert float(state.state) == 3
+
+    await hass.services.async_call(
+        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: BUZZ}, blocking=True
+    )
+    connect.assert_awaited_once()
+    assert client.write_gatt_char.await_args_list == [
+        call(VOLUME_CHARACTERISTIC, b"\x01", response=True),
+        call(BUZZER_CHARACTERISTIC, BUZZER_ON, response=True),
+    ]
+    await elapse(hass, 2)
+    assert connect.await_count == 1
+    await elapse(hass, 4)
+    assert connect.await_count == 2
+    client.write_gatt_char.assert_awaited_with(BUZZER_CHARACTERISTIC, BUZZER_OFF, response=True)
+
+    # The action without a duration uses the configured one as well
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ})
+    assert connect.await_count == 3
+    await elapse(hass, 2)
+    assert connect.await_count == 3
+    await elapse(hass, 4)
+    assert connect.await_count == 4
 
 
 async def test_stop_cancels_the_timed_stop(
     hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock
 ) -> None:
     """Pressing stop ends a buzz early and drops the pending stop."""
-    await buzz(hass, {ATTR_ENTITY_ID: ON}, **{ATTR_DURATION: 30})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 30})
     await hass.services.async_call(
         BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: OFF}, blocking=True
     )
@@ -117,9 +161,9 @@ async def test_new_buzz_replaces_the_timed_stop(
     hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock
 ) -> None:
     """A second buzz restarts the time; only the later stop runs."""
-    await buzz(hass, {ATTR_ENTITY_ID: ON}, **{ATTR_DURATION: 5})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 5})
     await elapse(hass, 3)
-    await buzz(hass, {ATTR_ENTITY_ID: ON}, **{ATTR_DURATION: 8})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 8})
     assert connect.await_count == 2
     # The first stop (due at 5 s) was dropped
     await elapse(hass, 6)
@@ -135,7 +179,7 @@ async def test_timed_stop_failure_is_logged(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A stop that fails after the time is a warning, not an error: the button stops itself."""
-    await buzz(hass, {ATTR_ENTITY_ID: ON}, **{ATTR_DURATION: 2})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 2})
     connect.side_effect = BleakError("le-connection-abort-by-local")
     with caplog.at_level(logging.WARNING):
         await elapse(hass, 3)
@@ -146,7 +190,7 @@ async def test_unload_drops_the_timed_stop(
     hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock
 ) -> None:
     """Unloading the entry cancels a pending stop."""
-    await buzz(hass, {ATTR_ENTITY_ID: ON}, **{ATTR_DURATION: 5})
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 5})
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     await elapse(hass, 6)
