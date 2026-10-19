@@ -2,6 +2,12 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.2] - 2026-10-19
+
+### Added
+
+- A brand icon, shown on the integrations page and the device page.
+
 ## [0.3.1] - 2026-10-19
 
 ### Fixed
