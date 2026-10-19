@@ -1,0 +1,53 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "description": "Pick a Shelly BLU button that a Bluetooth adapter of Home Assistant currently sees. The button has to be paired with that adapter once, see the documentation.",
+        "data": {
+          "address": "Button"
+        },
+        "data_description": {
+          "address": "Buttons in range of an adapter that can connect. Buttons seen only through a Bluetooth proxy that forwards advertisements are not listed."
+        }
+      },
+      "confirm": {
+        "description": "Set up {name} ({address})? Home Assistant connects once to check that the button is paired with its Bluetooth adapter."
+      }
+    },
+    "error": {
+      "cannot_connect": "Connection failed. Is the button paired with the Bluetooth adapter of Home Assistant, and in its range?",
+      "not_paired": "The button refused the access. Pair it with the Bluetooth adapter of Home Assistant first, see the documentation."
+    },
+    "abort": {
+      "already_configured": "This button is already set up.",
+      "already_in_progress": "This button is already being set up.",
+      "no_devices_found": "No Shelly BLU button in range of an adapter that can connect.",
+      "not_supported": "This device has no buzzer."
+    }
+  },
+  "entity": {
+    "button": {
+      "buzzer_on": {
+        "name": "Start buzzer"
+      },
+      "buzzer_off": {
+        "name": "Stop buzzer"
+      }
+    }
+  },
+  "exceptions": {
+    "not_in_range": {
+      "message": "{name} is out of range of every Bluetooth adapter that can connect."
+    },
+    "cannot_connect": {
+      "message": "Could not connect to {name}: {error}"
+    },
+    "not_paired": {
+      "message": "{name} refused the access: the button is not paired with the Bluetooth adapter of Home Assistant."
+    },
+    "write_failed": {
+      "message": "{name} did not accept the command: {error}"
+    }
+  }
+}

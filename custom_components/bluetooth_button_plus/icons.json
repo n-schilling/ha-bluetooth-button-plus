@@ -1,0 +1,12 @@
+{
+  "entity": {
+    "button": {
+      "buzzer_on": {
+        "default": "mdi:bell-ring"
+      },
+      "buzzer_off": {
+        "default": "mdi:bell-off"
+      }
+    }
+  }
+}

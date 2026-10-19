@@ -1,0 +1,53 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "description": "Wähle einen Shelly BLU Taster, den ein Bluetooth-Adapter von Home Assistant gerade sieht. Der Taster muss einmal mit diesem Adapter gekoppelt werden, siehe Dokumentation.",
+        "data": {
+          "address": "Taster"
+        },
+        "data_description": {
+          "address": "Taster in Reichweite eines Adapters, der Verbindungen aufbauen kann. Taster, die nur ein Bluetooth-Proxy mit Werbepaketen sieht, fehlen hier."
+        }
+      },
+      "confirm": {
+        "description": "{name} ({address}) einrichten? Home Assistant verbindet sich einmal, um zu prüfen, dass der Taster mit seinem Bluetooth-Adapter gekoppelt ist."
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen. Ist der Taster mit dem Bluetooth-Adapter von Home Assistant gekoppelt und in dessen Reichweite?",
+      "not_paired": "Der Taster hat den Zugriff abgelehnt. Kopple ihn zuerst mit dem Bluetooth-Adapter von Home Assistant, siehe Dokumentation."
+    },
+    "abort": {
+      "already_configured": "Dieser Taster ist schon eingerichtet.",
+      "already_in_progress": "Dieser Taster wird gerade eingerichtet.",
+      "no_devices_found": "Kein Shelly BLU Taster in Reichweite eines Adapters, der Verbindungen aufbauen kann.",
+      "not_supported": "Dieses Gerät hat keinen Buzzer."
+    }
+  },
+  "entity": {
+    "button": {
+      "buzzer_on": {
+        "name": "Buzzer starten"
+      },
+      "buzzer_off": {
+        "name": "Buzzer stoppen"
+      }
+    }
+  },
+  "exceptions": {
+    "not_in_range": {
+      "message": "{name} ist außer Reichweite aller Bluetooth-Adapter, die Verbindungen aufbauen können."
+    },
+    "cannot_connect": {
+      "message": "Keine Verbindung zu {name}: {error}"
+    },
+    "not_paired": {
+      "message": "{name} hat den Zugriff abgelehnt: Der Taster ist nicht mit dem Bluetooth-Adapter von Home Assistant gekoppelt."
+    },
+    "write_failed": {
+      "message": "{name} hat den Befehl nicht angenommen: {error}"
+    }
+  }
+}
