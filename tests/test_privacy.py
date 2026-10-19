@@ -26,6 +26,8 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 ALLOWED_MAC_PREFIX = "AA:BB:CC:DD:EE:"
 ALLOWED_IPV4_PREFIXES = ("192.0.2.", "198.51.100.", "203.0.113.")
 ALLOWED_MAIL_DOMAINS = ("users.noreply.github.com", "example.com")
+# File names that merely look like an address
+NOT_MAILS = ("icon@2x.png",)
 
 # The integration speaks Bluetooth only; none of these may be imported
 NETWORK_MODULES = {"aiohttp", "httpx", "requests", "urllib", "socket", "http", "ssl"}
@@ -44,7 +46,7 @@ def test_no_real_addresses() -> None:
         for ip in IPV4.findall(text):
             assert ip.startswith(ALLOWED_IPV4_PREFIXES), f"{path}: {ip}"
         for mail in EMAIL.findall(text):
-            assert mail.endswith(ALLOWED_MAIL_DOMAINS), f"{path}: {mail}"
+            assert mail in NOT_MAILS or mail.endswith(ALLOWED_MAIL_DOMAINS), f"{path}: {mail}"
 
 
 def test_no_network_libraries() -> None:
