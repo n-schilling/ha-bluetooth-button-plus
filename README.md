@@ -1,5 +1,6 @@
 # Bluetooth Button Plus for Home Assistant
 
+[![Release](https://img.shields.io/github/v/release/n-schilling/ha-bluetooth-button-plus)](https://github.com/n-schilling/ha-bluetooth-button-plus/releases)
 [![CI](https://github.com/n-schilling/ha-bluetooth-button-plus/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/n-schilling/ha-bluetooth-button-plus/actions/workflows/ci.yaml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![HACS: custom](https://img.shields.io/badge/HACS-custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
