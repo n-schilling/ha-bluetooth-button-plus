@@ -2,6 +2,23 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-11-10
+
+### Fixed
+
+- The entities are available only while the Home Assistant machine's own Bluetooth adapter sees the button. A Bluetooth proxy that can connect no longer keeps them available; it holds no bond, so a press through it failed with "not paired". A press never connects through a proxy any more.
+- The setup checks the button through the machine's own adapter, as every press does later, not through the scanner that reported it, and offers only buttons that adapter sees. A button seen only through a proxy gets a message of its own.
+- The setup reads the volume, which needs the bond, so it detects a missing pairing even when the button's services come from a cache.
+- A buzz or a stop that cannot reach the button keeps the pending stop of an earlier buzz, so the buzzer still stops on time instead of after a minute.
+- Unloading the integration cancels a timed stop that is still connecting and waits for a command in progress, so a reload never connects to the button twice at once.
+- The action `buzz` is registered when the integration is set up, so it exists while no button is loaded.
+
+### Changed
+
+- Requires Home Assistant 2026.11; installation through the Marketplace.
+- README: design with diagrams, examples, troubleshooting, interface; pairing with a passkey described first, without one as the unprotected alternative, and how to remove old bonds.
+- Tests on `pytest-homeassistant` 2026.11.1 with a simulated host adapter, ruff 0.17.4; `scripts/check.sh` runs the CI checks locally; the bug report form asks for the button instead of a display.
+
 ## [0.4.0] - 2026-10-19
 
 ### Fixed
