@@ -212,21 +212,22 @@ async def test_disconnect_errors_are_ignored(
 async def test_availability(
     hass: HomeAssistant, bluetooth: None, connect: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
-    """The buttons follow the button coming into and going out of range; the duration stays."""
+    """The buttons follow the button coming into and going out of range; the numbers stay."""
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
-    for entity_id in (ON, OFF, BUZZ, VOLUME):
+    for entity_id in (ON, OFF, BUZZ):
         state = hass.states.get(entity_id)
         assert state is not None
         assert state.state == STATE_UNAVAILABLE, entity_id
-    state = hass.states.get(DURATION)
-    assert state is not None
-    assert state.state != STATE_UNAVAILABLE
+    for entity_id in (DURATION, VOLUME):
+        state = hass.states.get(entity_id)
+        assert state is not None
+        assert state.state != STATE_UNAVAILABLE, entity_id
 
     inject(hass, service_info())
     await hass.async_block_till_done()
-    for entity_id in (ON, OFF, BUZZ, VOLUME):
+    for entity_id in (ON, OFF, BUZZ):
         state = hass.states.get(entity_id)
         assert state is not None
         assert state.state != STATE_UNAVAILABLE, entity_id
@@ -237,7 +238,7 @@ async def test_availability(
     # Its next advertisement through the proxy updates the entities
     config_entry.runtime_data.coordinator.async_update_listeners()
     await hass.async_block_till_done()
-    for entity_id in (ON, OFF, BUZZ, VOLUME):
+    for entity_id in (ON, OFF, BUZZ):
         state = hass.states.get(entity_id)
         assert state is not None
         assert state.state == STATE_UNAVAILABLE, entity_id
@@ -252,13 +253,14 @@ async def test_availability(
     # Home Assistant's Bluetooth manager reports the button gone
     config_entry.runtime_data.coordinator._async_handle_unavailable(service_info())
     await hass.async_block_till_done()
-    for entity_id in (ON, OFF, BUZZ, VOLUME):
+    for entity_id in (ON, OFF, BUZZ):
         state = hass.states.get(entity_id)
         assert state is not None
         assert state.state == STATE_UNAVAILABLE, entity_id
-    state = hass.states.get(DURATION)
-    assert state is not None
-    assert state.state != STATE_UNAVAILABLE
+    for entity_id in (DURATION, VOLUME):
+        state = hass.states.get(entity_id)
+        assert state is not None
+        assert state.state != STATE_UNAVAILABLE, entity_id
 
     assert await hass.config_entries.async_unload(config_entry.entry_id)
     await hass.async_block_till_done()

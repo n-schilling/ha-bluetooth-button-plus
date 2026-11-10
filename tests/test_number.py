@@ -43,7 +43,7 @@ async def set_volume(hass: HomeAssistant, value: int) -> None:
 async def test_volume(
     hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
 ) -> None:
-    """The volume starts at the button's factory setting and is written when set."""
+    """The volume starts at the button's factory setting; setting it does not connect."""
     state = hass.states.get(VOLUME)
     assert state is not None
     assert state.state == "1.0"
@@ -52,47 +52,53 @@ async def test_volume(
     assert state.attributes["step"] == 1
 
     await set_volume(hass, 3)
-    connect.assert_awaited_once()
-    client.write_gatt_char.assert_awaited_once_with(VOLUME_CHARACTERISTIC, b"\x03", response=True)
-    client.disconnect.assert_awaited_once()
+    connect.assert_not_awaited()
+    client.write_gatt_char.assert_not_awaited()
     state = hass.states.get(VOLUME)
     assert state is not None
     assert state.state == "3.0"
 
-    # The buzzer starts at the new volume from now on
-    client.write_gatt_char.reset_mock()
+    # The next start writes the new volume first, in the same connection
     await hass.services.async_call(
         BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: ON}, blocking=True
     )
+    connect.assert_awaited_once()
     assert client.write_gatt_char.await_args_list == [
         call(VOLUME_CHARACTERISTIC, b"\x03", response=True),
         call(BUZZER_CHARACTERISTIC, BUZZER_ON, response=True),
     ]
 
 
-async def test_volume_write_fails(
+async def test_volume_kept_when_start_fails(
     hass: HomeAssistant, entry: MockConfigEntry, client: MagicMock
 ) -> None:
-    """A refused write keeps the old volume."""
+    """A start that cannot reach the button keeps the volume for the next one."""
+    await set_volume(hass, 2)
     client.write_gatt_char.side_effect = BleakError("boom")
     with pytest.raises(HomeAssistantError) as excinfo:
-        await set_volume(hass, 2)
+        await hass.services.async_call(
+            BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: ON}, blocking=True
+        )
     assert excinfo.value.translation_key == "write_failed"
     state = hass.states.get(VOLUME)
     assert state is not None
-    assert state.state == "1.0"
+    assert state.state == "2.0"
+    assert entry.options[OPTION_VOLUME] == 2
 
 
 async def test_out_of_range(
     hass: HomeAssistant, bluetooth: None, connect: AsyncMock, config_entry: MockConfigEntry
 ) -> None:
-    """Out of range the volume cannot be set; the duration lives in Home Assistant and can."""
+    """Out of range the buttons are unavailable; volume and duration live in Home Assistant."""
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
-    state = hass.states.get(VOLUME)
+    state = hass.states.get(ON)
     assert state is not None
     assert state.state == STATE_UNAVAILABLE
+    state = hass.states.get(VOLUME)
+    assert state is not None
+    assert state.state == "1.0"
     state = hass.states.get(DURATION)
     assert state is not None
     assert float(state.state) == 10
@@ -100,12 +106,16 @@ async def test_out_of_range(
     assert state.attributes["device_class"] == "duration"
     assert state.attributes["min"] == 1
     assert state.attributes["max"] == 60
+    await set_volume(hass, 0)
     await hass.services.async_call(
         NUMBER_DOMAIN,
         SERVICE_SET_VALUE,
         {ATTR_ENTITY_ID: DURATION, ATTR_VALUE: 42},
         blocking=True,
     )
+    state = hass.states.get(VOLUME)
+    assert state is not None
+    assert state.state == "0.0"
     state = hass.states.get(DURATION)
     assert state is not None
     assert float(state.state) == 42

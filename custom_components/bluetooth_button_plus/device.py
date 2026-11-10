@@ -144,7 +144,7 @@ async def async_check_button(hass: HomeAssistant, ble_device: BLEDevice, name: s
 class BluButton:
     """A Shelly BLU button, addressed by its Bluetooth address.
 
-    Every command takes the lock, so a start, a stop, a volume and a timed stop
+    Every command takes the lock, so a start, a stop and a timed stop
     never interleave. A generation counter tells a timed stop whether a newer
     command has overtaken it while it waited for the lock. A command replaces
     a pending timed stop only once its own write succeeded, so a failed start
@@ -176,12 +176,6 @@ class BluButton:
         async with self._lock:
             await self._async_write((BUZZER_CHARACTERISTIC, BUZZER_OFF))
             self._async_supersede()
-
-    async def async_set_volume(self, volume: int) -> None:
-        """Write the volume to the button and keep it as the configured one."""
-        async with self._lock:
-            await self._async_write((VOLUME_CHARACTERISTIC, bytes([volume])))
-            self.volume = volume
 
     async def async_buzz(self, duration: float | None = None, volume: int | None = None) -> None:
         """Start the buzzer and stop it after the duration in seconds.

@@ -15,6 +15,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Changed
 
+- *Buzzer volume* is kept in Home Assistant, like *Buzz duration*: setting it no longer connects to the button, so it can be set while the button is away and stays available. Every start of the buzzer writes it first, in the same connection, as before.
 - Requires Home Assistant 2026.11; installation through the Marketplace.
 - README: design with diagrams, examples, troubleshooting, interface; pairing with a passkey described first, without one as the unprotected alternative, and how to remove old bonds.
 - Tests on `pytest-homeassistant` 2026.11.1 with a simulated host adapter, ruff 0.17.4; `scripts/check.sh` runs the CI checks locally; the bug report form asks for the button instead of a display.

@@ -265,8 +265,8 @@ async def test_stop_task_overtaken_by_a_queued_buzz(
 ) -> None:
     """A stop queued behind a new buzz at the lock finds a newer generation and steps aside.
 
-    A volume write holds the lock; a new buzz queues up behind it; then the
-    first buzz's stop falls due and queues up behind the new buzz.
+    Something holds the lock; a new buzz queues up behind it; then the first
+    buzz's stop falls due and queues up behind the new buzz.
     """
     gate = asyncio.Event()
     gate.set()
@@ -282,7 +282,13 @@ async def test_stop_task_overtaken_by_a_queued_buzz(
 
     gate.clear()
     entered.clear()
-    holder = hass.async_create_task(button.async_set_volume(2))
+
+    async def hold_lock() -> None:
+        async with button._lock:
+            entered.set()
+            await gate.wait()
+
+    holder = hass.async_create_task(hold_lock())
     await entered.wait()
     second = hass.async_create_task(button.async_buzz(5))
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=6))
@@ -292,11 +298,11 @@ async def test_stop_task_overtaken_by_a_queued_buzz(
     await second
     await hass.async_block_till_done()
     assert not any(call.args[1] == BUZZER_OFF for call in client.write_gatt_char.await_args_list)
-    assert connect.await_count == 3
+    assert connect.await_count == 2
 
     await elapse(hass, 12)
     assert client.write_gatt_char.await_args_list[-1].args[1] == BUZZER_OFF
-    assert connect.await_count == 4
+    assert connect.await_count == 3
 
 
 async def test_failed_buzz_keeps_the_earlier_stop(

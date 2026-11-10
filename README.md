@@ -29,9 +29,11 @@ flowchart LR
     button -.->|"advertisements"| proxy
     adapter --> availability
     proxy -.->|"no bond: does not count"| availability
-    availability --> entities["Buttons Buzz, Start, Stop<br/>numbers Volume, Duration"]
+    availability --> entities["Buttons Buzz, Start, Stop"]
+    settings["Numbers Volume, Duration<br/>kept in Home Assistant"] --> connection
     automations["Your automations"] --> action["Action buzz"]
     automations --> entities
+    automations --> settings
     entities --> connection
     action --> connection
     connection -->|"connect, write, disconnect"| adapter
@@ -70,13 +72,13 @@ stateDiagram-v2
     Available --> Unavailable: only a proxy still sees it
 ```
 
-The buttons and the volume are available only while the adapter of the Home Assistant machine sees the button. A Bluetooth proxy does not count, not even one that can connect: Shelly devices as proxies only forward advertisements, and an [ESPHome proxy](https://esphome.io/components/bluetooth_proxy.html) holds no bond with the button, which refuses it. With several adapters on the machine, the one with the best signal is used.
+The buttons are available only while the adapter of the Home Assistant machine sees the button. A Bluetooth proxy does not count, not even one that can connect: Shelly devices as proxies only forward advertisements, and an [ESPHome proxy](https://esphome.io/components/bluetooth_proxy.html) holds no bond with the button, which refuses it. With several adapters on the machine, the one with the best signal is used.
 
 Out of range, the entities are *unavailable*, and Home Assistant skips a press or the action for an unavailable entity: an automation goes on, and the log notes that the entity is unavailable. Only in the short gap between the last advertisement and the moment Home Assistant marks the button unavailable does a press fail with a message of its own.
 
 ### Settings
 
-*Buzzer volume* and *Buzz duration* are kept in the integration's configuration, so they survive a restart and a disabled entity. The duration exists in Home Assistant only and can be set while the button is away. The volume is written to the button when set and again before every start of the buzzer. The button cannot be asked for its volume without a connection, so a volume changed in the Shelly app is not shown here; it is overwritten at the next start.
+*Buzzer volume* and *Buzz duration* are kept in the integration's configuration, so they survive a restart and a disabled entity. Setting them does not connect to the button, so both can be set while the button is away. The duration exists in Home Assistant only; the volume is written to the button at every start of the buzzer, in the same connection as the start. The button cannot be asked for its volume without a connection, so a volume changed in the Shelly app is not shown here; it is overwritten at the next start.
 
 ### Supported devices
 
@@ -150,7 +152,7 @@ The device of the button works as target as well; it buzzes once.
 | Start buzzer (`button`) | Writes the buzzer volume and starts the buzzer. The button stops it by itself after a minute. |
 | Stop buzzer (`button`) | Stops the buzzer before that, and replaces a pending timed stop. |
 | Buzz duration (`number`, configuration) | Seconds *Buzz* and the action without `duration` buzz, 1–60 (default 10). Always available. |
-| Buzzer volume (`number`, configuration) | 0 off, 1 low, 2 medium, 3 high (default 1). Written to the button when set and before every start. |
+| Buzzer volume (`number`, configuration) | 0 off, 1 low, 2 medium, 3 high (default 1). Kept in Home Assistant and written to the button at every start. Always available. |
 
 Unique IDs are `<address>_<key>` with the keys `buzz`, `buzzer_on`, `buzzer_off`, `duration` and `volume`.
 

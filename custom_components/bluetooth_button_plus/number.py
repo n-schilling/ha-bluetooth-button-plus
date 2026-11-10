@@ -16,7 +16,7 @@ from .const import (
     VOLUME_MAX,
     VOLUME_MIN,
 )
-from .entity import BluButtonDeviceEntity, BluButtonEntity
+from .entity import BluButtonDeviceEntity
 
 PARALLEL_UPDATES = 1
 
@@ -30,12 +30,12 @@ async def async_setup_entry(
     async_add_entities([BuzzerVolumeNumber(entry), BuzzDurationNumber(entry)])
 
 
-class BuzzerVolumeNumber(BluButtonEntity, NumberEntity):
+class BuzzerVolumeNumber(BluButtonDeviceEntity, NumberEntity):
     """The volume the buzzer starts with: 0 off, 1 low, 2 medium, 3 high.
 
-    The button cannot be asked for its volume without a connection, so the
-    entity shows the value Home Assistant set last, kept in the entry's
-    options; every start of the buzzer writes it to the button first.
+    Kept in Home Assistant, like the duration: setting it does not connect,
+    so it can be set while the button is away. Every start of the buzzer
+    writes it to the button first, in the same connection.
     """
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -54,8 +54,8 @@ class BuzzerVolumeNumber(BluButtonEntity, NumberEntity):
         return float(self._device.volume)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Write the volume to the button and keep it."""
-        await self._device.async_set_volume(int(value))
+        """Keep the volume; the next start writes it to the button."""
+        self._device.volume = int(value)
         self._async_save_option(OPTION_VOLUME, int(value))
         self.async_write_ha_state()
 
