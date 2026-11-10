@@ -13,7 +13,8 @@ body:
     id: version
     attributes:
       label: Integration version
-      placeholder: e.g. 0.1.0
+      description: From the integration's entry under Settings → Devices & services, or the Marketplace.
+      placeholder: e.g. 0.5.0
     validations:
       required: true
   - type: input
@@ -21,20 +22,20 @@ body:
     attributes:
       label: Home Assistant version
       description: From Settings → About.
-      placeholder: e.g. 2026.10.0
+      placeholder: e.g. 2026.11.1
     validations:
       required: true
   - type: input
-    id: display
+    id: button
     attributes:
-      label: Display model and firmware
-      description: From the display's web interface or its device page in Home Assistant.
-      placeholder: e.g. SAWD-3A1XE10EU2, firmware 2.8.2
+      label: Button model
+      description: The model shown on the device page, and whether it is paired with or without a passkey.
+      placeholder: e.g. SBBT-102C, paired without a passkey
     validations:
       required: true
   - type: textarea
     id: log
     attributes:
-      label: Diagnostics or log
-      description: Download the diagnostics from the integration's page; they hold no password, address or announcement texts. Copied log lines can contain addresses and URLs, please check them before posting.
+      label: Log
+      description: Log lines of bluetooth_button_plus, with debug logging if you can. They can contain Bluetooth addresses; replace them before posting if you prefer.
       render: text
