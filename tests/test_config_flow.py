@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, call
 
-from bleak.exc import BleakError
+from bleak.exc import BleakDBusError, BleakError
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from homeassistant.config_entries import SOURCE_BLUETOOTH, SOURCE_USER
 from homeassistant.const import CONF_ADDRESS, CONF_MODEL
@@ -19,13 +19,14 @@ from custom_components.bluetooth_button_plus.const import (
     VOLUME_CHARACTERISTIC,
 )
 
-from . import ADDRESS, NAME, OTHER_ADDRESS, TITLE, inject, service_info
+from . import ADDRESS, NAME, OTHER_ADDRESS, TITLE, inject, see_locally, service_info
 
 
 async def test_discovery(
     hass: HomeAssistant, bluetooth: None, connect: AsyncMock, client: MagicMock
 ) -> None:
     """A discovered button is confirmed; the setup connects once to check it."""
+    see_locally(hass, service_info())
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
     )
@@ -46,6 +47,9 @@ async def test_discovery(
         call(BUZZER_CHARACTERISTIC),
         call(VOLUME_CHARACTERISTIC),
     ]
+    # Reading the volume needs the bond: that is the pairing check; nothing is written
+    client.read_gatt_char.assert_awaited_once()
+    client.write_gatt_char.assert_not_awaited()
     client.disconnect.assert_awaited_once()
 
 
@@ -82,6 +86,7 @@ async def test_discovery_connection_errors(
     hass: HomeAssistant, bluetooth: None, connect: AsyncMock, error: Exception, expected: str
 ) -> None:
     """A failed check shows the error and lets the user try again."""
+    see_locally(hass, service_info())
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
     )
@@ -101,6 +106,7 @@ async def test_discovery_without_buzzer(
 ) -> None:
     """A device without the buzzer characteristic is refused after the check."""
     client.services.get_characteristic.return_value = None
+    see_locally(hass, service_info())
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
     )
@@ -115,6 +121,8 @@ async def test_user_flow(hass: HomeAssistant, bluetooth: None, connect: AsyncMoc
     inject(hass, service_info())
     inject(hass, service_info(address=OTHER_ADDRESS, name="SBDW-002C"))
     inject(hass, service_info(address="AA:BB:CC:DD:EE:03", connectable=False))
+    # Seen only by a proxy: the bond is on the host, so it is not offered
+    inject(hass, service_info(address="AA:BB:CC:DD:EE:04", source="esphome-proxy"))
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -187,9 +195,74 @@ async def test_discovery_without_volume(
     client.services.get_characteristic.side_effect = lambda uuid: (
         None if uuid == VOLUME_CHARACTERISTIC else object()
     )
+    see_locally(hass, service_info())
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
     )
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "not_supported"
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (BleakDBusError("org.bluez.Error.NotPermitted", ["Read not permitted"]), "not_paired"),
+        (BleakError("Insufficient encryption"), "not_paired"),
+        (BleakError("disconnected"), "cannot_connect"),
+        (TimeoutError(), "cannot_connect"),
+    ],
+)
+async def test_discovery_read_refused(
+    hass: HomeAssistant,
+    bluetooth: None,
+    connect: AsyncMock,
+    client: MagicMock,
+    error: Exception,
+    expected: str,
+) -> None:
+    """The connection succeeds from cached services, but reading the volume needs the bond."""
+    see_locally(hass, service_info())
+    client.read_gatt_char.side_effect = error
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": expected}
+    client.disconnect.assert_awaited_once()
+
+
+async def test_discovery_volume_not_readable(
+    hass: HomeAssistant, bluetooth: None, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A volume that cannot be read at all leaves the check to the connection."""
+    client.services.get_characteristic.return_value.properties = ["write"]
+    see_locally(hass, service_info())
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=service_info()
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    client.read_gatt_char.assert_not_awaited()
+
+
+async def test_discovery_through_a_proxy(
+    hass: HomeAssistant, bluetooth: None, connect: AsyncMock
+) -> None:
+    """A button reported by a proxy is checked through the host's adapter, or not at all."""
+    proxied = service_info(source="esphome-proxy")
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=proxied
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "not_in_range"}
+    connect.assert_not_awaited()
+
+    # Once the host's adapter sees it, the check connects through that adapter
+    local = service_info()
+    see_locally(hass, local)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert connect.await_args.args[1] is local.device

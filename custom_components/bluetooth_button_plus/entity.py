@@ -15,6 +15,7 @@ from homeassistant.helpers.entity import Entity
 
 from . import BluButtonConfigEntry
 from .const import DOMAIN
+from .device import local_ble_device
 
 
 class BluButtonDeviceEntity(Entity):
@@ -49,14 +50,20 @@ class BluButtonEntity(
     PassiveBluetoothCoordinatorEntity[PassiveBluetoothDataUpdateCoordinator],
     BluButtonDeviceEntity,
 ):
-    """An entity that needs the button in range.
+    """An entity that needs the button in range of the host's own adapter.
 
-    Available only while an adapter that can connect sees the button: the
-    buzzer cannot be reached through a scanner that only forwards
-    advertisements, such as a Shelly Bluetooth proxy.
+    Available only while an adapter of the host sees the button: the bond
+    lives there, so neither a Bluetooth proxy that only forwards
+    advertisements nor one that can connect reaches the buzzer. Every
+    advertisement, also one through a proxy, updates the availability.
     """
 
     def __init__(self, entry: BluButtonConfigEntry, key: str) -> None:
         """Initialize the entity."""
         PassiveBluetoothCoordinatorEntity.__init__(self, entry.runtime_data.coordinator)
         BluButtonDeviceEntity.__init__(self, entry, key)
+
+    @property
+    def available(self) -> bool:
+        """Return whether the coordinator and an adapter of the host see the button."""
+        return super().available and local_ble_device(self.hass, self._device.address) is not None

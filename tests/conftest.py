@@ -6,34 +6,38 @@ from collections.abc import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
+from homeassistant.components.bluetooth import async_register_scanner
 from homeassistant.const import CONF_ADDRESS, CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from custom_components.bluetooth_button_plus.const import DOMAIN
 
-from . import ADDRESS, NAME, TITLE, inject, service_info
-
-
-@pytest.fixture(autouse=True)
-def _custom_integrations(enable_custom_integrations: None) -> None:
-    """Load the integration from custom_components."""
+from . import ADDRESS, LOCAL_SCANNER, NAME, TITLE, LocalScanner, inject, service_info
 
 
 @pytest.fixture
-async def bluetooth(hass: HomeAssistant, mock_bluetooth: None) -> None:
-    """Set up the Bluetooth integration with a simulated adapter."""
+async def bluetooth(hass: HomeAssistant, mock_bluetooth: None) -> AsyncGenerator[None]:
+    """Set up the Bluetooth integration with a simulated adapter of the host."""
     assert await async_setup_component(hass, "bluetooth", {})
     await hass.async_block_till_done()
+    scanner = LocalScanner()
+    hass.data[LOCAL_SCANNER] = scanner
+    unregister = async_register_scanner(hass, scanner)
+    yield
+    unregister()
 
 
 @pytest.fixture
 def client() -> MagicMock:
     """A connected bleak client of a button with a buzzer."""
     client = MagicMock()
-    client.services.get_characteristic.return_value = object()
+    characteristic = MagicMock()
+    characteristic.properties = ["read", "write"]
+    client.services.get_characteristic.return_value = characteristic
+    client.read_gatt_char = AsyncMock(return_value=b"\x01")
     client.write_gatt_char = AsyncMock()
     client.disconnect = AsyncMock()
     return client

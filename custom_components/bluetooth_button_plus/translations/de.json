@@ -3,12 +3,12 @@
     "flow_title": "{name}",
     "step": {
       "user": {
-        "description": "Wähle einen Shelly BLU Taster, den ein Bluetooth-Adapter von Home Assistant gerade sieht. Der Taster muss einmal mit diesem Adapter gekoppelt werden, siehe Dokumentation.",
+        "description": "Wähle einen Shelly BLU Taster, den der Bluetooth-Adapter des Home-Assistant-Rechners gerade sieht. Der Taster muss einmal mit diesem Adapter gekoppelt werden, siehe Dokumentation.",
         "data": {
           "address": "Taster"
         },
         "data_description": {
-          "address": "Taster in Reichweite eines Adapters, der Verbindungen aufbauen kann. Taster, die nur ein Bluetooth-Proxy mit Werbepaketen sieht, fehlen hier."
+          "address": "Taster in Reichweite des eigenen Adapters des Rechners. Taster, die nur ein Bluetooth-Proxy sieht, fehlen hier: Die Kopplung liegt auf dem Rechner, über einen Proxy ist der Buzzer nicht erreichbar."
         }
       },
       "confirm": {
@@ -17,12 +17,13 @@
     },
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen. Ist der Taster mit dem Bluetooth-Adapter von Home Assistant gekoppelt und in dessen Reichweite?",
+      "not_in_range": "Der Taster ist nicht in Reichweite des Bluetooth-Adapters des Home-Assistant-Rechners. Bring ihn näher heran und versuche es erneut.",
       "not_paired": "Der Taster hat den Zugriff abgelehnt. Kopple ihn zuerst mit dem Bluetooth-Adapter von Home Assistant, siehe Dokumentation."
     },
     "abort": {
       "already_configured": "Dieser Taster ist schon eingerichtet.",
       "already_in_progress": "Dieser Taster wird gerade eingerichtet.",
-      "no_devices_found": "Kein Shelly BLU Taster in Reichweite eines Adapters, der Verbindungen aufbauen kann.",
+      "no_devices_found": "Kein Shelly BLU Taster in Reichweite des Bluetooth-Adapters des Home-Assistant-Rechners.",
       "not_supported": "Dieses Gerät hat keinen Buzzer mit Lautstärke."
     }
   },
@@ -49,7 +50,7 @@
   },
   "exceptions": {
     "not_in_range": {
-      "message": "{name} ist außer Reichweite aller Bluetooth-Adapter, die Verbindungen aufbauen können."
+      "message": "{name} ist außer Reichweite des Bluetooth-Adapters des Home-Assistant-Rechners."
     },
     "cannot_connect": {
       "message": "Keine Verbindung zu {name}: {error}"

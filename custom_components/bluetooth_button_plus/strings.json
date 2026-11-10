@@ -3,12 +3,12 @@
     "flow_title": "{name}",
     "step": {
       "user": {
-        "description": "Pick a Shelly BLU button that a Bluetooth adapter of Home Assistant currently sees. The button has to be paired with that adapter once, see the documentation.",
+        "description": "Pick a Shelly BLU button that the Bluetooth adapter of the Home Assistant machine currently sees. The button has to be paired with that adapter once, see the documentation.",
         "data": {
           "address": "Button"
         },
         "data_description": {
-          "address": "Buttons in range of an adapter that can connect. Buttons seen only through a Bluetooth proxy that forwards advertisements are not listed."
+          "address": "Buttons in range of the machine's own adapter. Buttons seen only through a Bluetooth proxy are not listed: the bond lives on the machine, so a proxy cannot reach the buzzer."
         }
       },
       "confirm": {
@@ -17,12 +17,13 @@
     },
     "error": {
       "cannot_connect": "Connection failed. Is the button paired with the Bluetooth adapter of Home Assistant, and in its range?",
+      "not_in_range": "The button is not in range of the Bluetooth adapter of the Home Assistant machine. Bring it closer and try again.",
       "not_paired": "The button refused the access. Pair it with the Bluetooth adapter of Home Assistant first, see the documentation."
     },
     "abort": {
       "already_configured": "This button is already set up.",
       "already_in_progress": "This button is already being set up.",
-      "no_devices_found": "No Shelly BLU button in range of an adapter that can connect.",
+      "no_devices_found": "No Shelly BLU button in range of the Bluetooth adapter of the Home Assistant machine.",
       "not_supported": "This device has no buzzer with a volume."
     }
   },
@@ -49,7 +50,7 @@
   },
   "exceptions": {
     "not_in_range": {
-      "message": "{name} is out of range of every Bluetooth adapter that can connect."
+      "message": "{name} is out of range of the Bluetooth adapter of the Home Assistant machine."
     },
     "cannot_connect": {
       "message": "Could not connect to {name}: {error}"

@@ -1,42 +1,20 @@
-"""Buttons: buzz for the configured time, start and stop the buzzer; the action "buzz"."""
+"""Buttons: buzz for the configured time, start and stop the buzzer."""
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-import probatio
-
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.components.button.const import ButtonDeviceClass
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.typing import VolDictType
 
 from . import BluButtonConfigEntry
-from .const import (
-    ATTR_DURATION,
-    ATTR_VOLUME,
-    MAX_BUZZ_SECONDS,
-    MIN_BUZZ_SECONDS,
-    SERVICE_BUZZ,
-    VOLUME_MAX,
-    VOLUME_MIN,
-)
 from .device import BluButton
 from .entity import BluButtonEntity
 
 PARALLEL_UPDATES = 1
-
-BUZZ_SCHEMA: VolDictType = {
-    probatio.Optional(ATTR_DURATION): probatio.All(
-        probatio.Coerce(float), probatio.Range(min=MIN_BUZZ_SECONDS, max=MAX_BUZZ_SECONDS)
-    ),
-    probatio.Optional(ATTR_VOLUME): probatio.All(
-        probatio.Coerce(int), probatio.Range(min=VOLUME_MIN, max=VOLUME_MAX)
-    ),
-}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -73,13 +51,7 @@ async def async_setup_entry(
     entry: BluButtonConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the buttons and the action "buzz"."""
-    entity_platform.async_get_current_platform().async_register_entity_service(
-        SERVICE_BUZZ,
-        BUZZ_SCHEMA,
-        "async_buzz",
-        entity_device_classes=[ButtonDeviceClass.IDENTIFY],
-    )
+    """Set up the buttons."""
     async_add_entities(BluButtonButton(entry, description) for description in BUTTONS)
 
 

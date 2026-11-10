@@ -14,7 +14,7 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS, CONF_MODEL
 
 from .const import BUTTON_NAME_PREFIX, DOMAIN
-from .device import CannotConnect, NotPaired, NotSupported, async_check_button
+from .device import CannotConnect, NotPaired, NotSupported, async_check_button, local_ble_device
 
 
 def is_button(info: BluetoothServiceInfoBleak) -> bool:
@@ -83,7 +83,11 @@ class BluetoothButtonPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         else:
             configured = self._async_current_ids(include_ignore=False)
             for info in async_discovered_service_info(self.hass, connectable=True):
-                if info.address not in configured and is_button(info):
+                if (
+                    info.address not in configured
+                    and is_button(info)
+                    and local_ble_device(self.hass, info.address) is not None
+                ):
                     self._discovered[info.address] = info
             if not self._discovered:
                 return self.async_abort(reason="no_devices_found")
@@ -102,9 +106,16 @@ class BluetoothButtonPlusConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_finish(
         self, info: BluetoothServiceInfoBleak, errors: dict[str, str]
     ) -> ConfigFlowResult | None:
-        """Check the button and create the entry; on an error fill errors and return None."""
+        """Check the button and create the entry; on an error fill errors and return None.
+
+        The check connects through the host's own adapter, as every command
+        does later, not through whichever scanner reported the button.
+        """
+        if (device := local_ble_device(self.hass, info.address)) is None:
+            errors["base"] = "not_in_range"
+            return None
         try:
-            await async_check_button(self.hass, info.device, title_of(info))
+            await async_check_button(self.hass, device, title_of(info))
         except NotSupported:
             return self.async_abort(reason="not_supported")
         except NotPaired:

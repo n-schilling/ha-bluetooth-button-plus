@@ -8,7 +8,7 @@ ignore = ["RUF012"]
 [lint.isort]
 force-sort-within-sections = true
 known-first-party = ["custom_components.bluetooth_button_plus"]
-known-third-party = ["pytest_homeassistant_custom_component"]
+known-third-party = ["pytest_homeassistant"]
 combine-as-imports = true
 split-on-trailing-comma = false
 section-order = ["future", "standard-library", "third-party", "homeassistant", "first-party", "local-folder"]

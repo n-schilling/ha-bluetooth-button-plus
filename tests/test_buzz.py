@@ -9,14 +9,15 @@ from unittest.mock import AsyncMock, MagicMock, call
 
 from bleak.exc import BleakError
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
+from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
 
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
 from homeassistant.components.number import ATTR_VALUE, DOMAIN as NUMBER_DOMAIN, SERVICE_SET_VALUE
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceNotSupported
+from homeassistant.exceptions import HomeAssistantError, ServiceNotSupported
 from homeassistant.helpers import device_registry as dr
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
 from custom_components.bluetooth_button_plus.const import (
@@ -296,3 +297,87 @@ async def test_stop_task_overtaken_by_a_queued_buzz(
     await elapse(hass, 12)
     assert client.write_gatt_char.await_args_list[-1].args[1] == BUZZER_OFF
     assert connect.await_count == 4
+
+
+async def test_failed_buzz_keeps_the_earlier_stop(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A second buzz that cannot start leaves the first buzz's stop in place."""
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 10})
+    await elapse(hass, 2)
+    connect.side_effect = BleakError("le-connection-abort-by-local")
+    with pytest.raises(HomeAssistantError):
+        await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 10})
+    connect.side_effect = None
+    await elapse(hass, 11)
+    assert client.write_gatt_char.await_args_list[-1] == call(
+        BUZZER_CHARACTERISTIC, BUZZER_OFF, response=True
+    )
+
+
+async def test_failed_stop_keeps_the_timed_stop(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A stop button press that fails leaves the timed stop to try again."""
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 5})
+    connect.side_effect = BleakError("le-connection-abort-by-local")
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: OFF}, blocking=True
+        )
+    connect.side_effect = None
+    await elapse(hass, 6)
+    assert client.write_gatt_char.await_args_list[-1] == call(
+        BUZZER_CHARACTERISTIC, BUZZER_OFF, response=True
+    )
+
+
+async def test_unload_cancels_a_running_timed_stop(
+    hass: HomeAssistant, entry: MockConfigEntry, connect: AsyncMock, client: MagicMock
+) -> None:
+    """A timed stop that is still connecting is cancelled by an unload, which waits for it."""
+    await buzz(hass, {ATTR_ENTITY_ID: BUZZ}, **{ATTR_DURATION: 2})
+    gate = asyncio.Event()
+    entered = asyncio.Event()
+
+    async def hanging_connect(*_args: object, **_kwargs: object) -> MagicMock:
+        entered.set()
+        await gate.wait()
+        return client
+
+    connect.side_effect = hanging_connect
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=3))
+    await entered.wait()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    # The stop never wrote; the button stops the buzzer by itself after a minute
+    assert not any(c.args[1] == BUZZER_OFF for c in client.write_gatt_char.await_args_list)
+
+
+async def test_unload_waits_for_a_command(
+    hass: HomeAssistant, entry: MockConfigEntry, client: MagicMock
+) -> None:
+    """An unload returns only after a command in progress, so a reload never connects twice."""
+    gate = asyncio.Event()
+    entered = asyncio.Event()
+
+    async def write(*_args: object, **_kwargs: object) -> None:
+        entered.set()
+        await gate.wait()
+
+    client.write_gatt_char = AsyncMock(side_effect=write)
+    start = hass.async_create_task(entry.runtime_data.button.async_start_buzzer())
+    await entered.wait()
+    unload = hass.async_create_task(hass.config_entries.async_unload(entry.entry_id))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert not unload.done()
+    gate.set()
+    await start
+    assert await unload
+
+
+async def test_action_exists_without_a_button(hass: HomeAssistant, bluetooth: None) -> None:
+    """The action is registered with the integration, not with a loaded button."""
+    assert await async_setup_component(hass, DOMAIN, {})
+    assert hass.services.has_service(DOMAIN, SERVICE_BUZZ)
