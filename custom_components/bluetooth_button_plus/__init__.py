@@ -15,7 +15,7 @@ from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
 from homeassistant.components.button.const import ButtonDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, service
 from homeassistant.helpers.typing import ConfigType, VolDictType
 
@@ -33,7 +33,7 @@ from .const import (
     VOLUME_MAX,
     VOLUME_MIN,
 )
-from .device import BluButton
+from .device import BluButton, local_ble_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,6 +99,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: BluButtonConfigEntry) ->
         hass, _LOGGER, address, BluetoothScanningMode.PASSIVE, connectable=True
     )
     entry.runtime_data = RuntimeData(button, coordinator)
+
+    @callback
+    def _async_note_range() -> None:
+        button.async_set_in_range(
+            coordinator.available and local_ble_device(hass, address) is not None
+        )
+
+    entry.async_on_unload(coordinator.async_add_listener(_async_note_range))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(coordinator.async_start())
     return True

@@ -91,7 +91,7 @@ The buzzer characteristic is documented for the BLU Button1 and the BLU Button T
 
 ### Privacy
 
-The integration stores the Bluetooth address and the model name of each button in its config entry, and the two settings in its options. It reads nothing from the button but the volume during setup, and sends nothing anywhere else.
+The integration stores the Bluetooth address and the model name of each button in its config entry, and the two settings in its options. It reads nothing from the button but the volume during setup, and sends nothing anywhere else. Its diagnostics leave out the address, the title and the names of the Bluetooth scanners.
 
 ## Examples
 
@@ -137,7 +137,7 @@ The device of the button works as target as well; it buzzes once.
 
 ## Troubleshooting
 
-- **The entities are unavailable, but the button is seen:** another integration may see it through a Bluetooth proxy. Only the adapter of the Home Assistant machine counts; bring the button closer to the machine.
+- **The entities are unavailable, but the button is seen:** another integration may see it through a Bluetooth proxy. Only the adapter of the Home Assistant machine counts; bring the button closer to the machine. The log notes once when the button leaves the range of the machine's adapter and once when it is back. The diagnostics (**Settings → Devices & services → Bluetooth Button Plus → ⋮ → Download diagnostics**) list which adapters and proxies see it, with their signal, and whether a command or a timed stop is running.
 - **Setup or a press says the button refused the access:** the bond is missing. A button remembers four paired devices and a fifth replaces the one used least; pair it again, see [Pairing](#pairing).
 - **"Could not connect":** the button is busy with another connection (the Shelly app, for example) or at the edge of the range; try again.
 - **A press succeeds, but nothing beeps:** enable *Buzzer* in the device settings of the Shelly app, and check that *Buzzer volume* is not 0.

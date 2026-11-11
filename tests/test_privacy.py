@@ -79,6 +79,12 @@ def test_no_network_libraries() -> None:
             assert not name.startswith(NETWORK_PATHS), f"{path}: {name}"
 
 
-def test_no_diagnostics() -> None:
-    """There is nothing to download: the integration offers no diagnostics."""
-    assert not (PACKAGE / "diagnostics.py").exists()
+def test_diagnostics_without_address() -> None:
+    """The diagnostics never name the address, the title or a scanner.
+
+    tests/test_diagnostics.py checks the output; this checks that the code
+    reads none of them in the first place.
+    """
+    source = (PACKAGE / "diagnostics.py").read_text(encoding="utf-8")
+    for forbidden in ("CONF_ADDRESS", "entry.title", "as_dict", ".name", ".source"):
+        assert forbidden not in source, forbidden

@@ -13,6 +13,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Unloading the integration cancels a timed stop that is still connecting and waits for a command in progress, so a reload never connects to the button twice at once.
 - The action `buzz` is registered when the integration is set up, so it exists while no button is loaded.
 
+### Added
+
+- Diagnostics: which adapters and proxies see the button, with their signal, and whether a command or a timed stop is running; without the address, the title or scanner names.
+- The log notes once when a button leaves the range of the Home Assistant machine's adapter and once when it is back.
+- Quality scale up to Platinum, rule by rule in quality_scale.yaml and checked by the tests.
+
 ### Changed
 
 - *Buzzer volume* is kept in Home Assistant, like *Buzz duration*: setting it no longer connects to the button, so it can be set while the button is away and stays available. Every start of the buzzer writes it first, in the same connection, as before.

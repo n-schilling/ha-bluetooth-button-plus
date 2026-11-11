@@ -164,6 +164,40 @@ class BluButton:
         self._generation = 0
         self._stop_timer: CALLBACK_TYPE | None = None
         self._stop_task: asyncio.Task[None] | None = None
+        self._in_range: bool | None = None
+
+    @property
+    def in_range(self) -> bool | None:
+        """Return whether the host's adapter sees the button; None until first known."""
+        return self._in_range
+
+    @property
+    def busy(self) -> bool:
+        """Return whether a command is running."""
+        return self._lock.locked()
+
+    @property
+    def stop_pending(self) -> bool:
+        """Return whether a timed stop is waiting or running."""
+        return self._stop_timer is not None or (
+            self._stop_task is not None and not self._stop_task.done()
+        )
+
+    @callback
+    def async_set_in_range(self, in_range: bool) -> None:
+        """Note whether the host's adapter sees the button; log once per change."""
+        if in_range == self._in_range:
+            return
+        if self._in_range is not None:
+            if in_range:
+                _LOGGER.info("%s is back in range of the host's Bluetooth adapter", self.name)
+            else:
+                _LOGGER.info(
+                    "%s is out of range of the host's Bluetooth adapter; "
+                    "its buttons are unavailable until it is seen again",
+                    self.name,
+                )
+        self._in_range = in_range
 
     async def async_start_buzzer(self, volume: int | None = None) -> None:
         """Start the buzzer at the volume, or at the configured one; the button stops it."""
