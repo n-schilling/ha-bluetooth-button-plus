@@ -220,7 +220,7 @@ scripts/check.sh
 
 The tests simulate the machine's adapter and the button; no Bluetooth hardware is needed.
 
-Releases: CI on `main` tags the version from `manifest.json` and publishes a GitHub release with its CHANGELOG section; the Marketplace offers it as an update.
+Releases: CI runs on `dev`; once it is green, push that commit to `main`. CI does not run again there: the release workflow checks that CI passed for the commit, then tags the version from `manifest.json` and publishes a GitHub release with its CHANGELOG section; the Marketplace offers it as an update.
 
 ## License
 
