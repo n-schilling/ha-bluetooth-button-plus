@@ -24,3 +24,5 @@ updates:
       - dependency-name: aiousbwatcher
       - dependency-name: serialx
       - dependency-name: aiohasupervisor
+      # Home Assistant itself, its frontend and test harness: moved by hand with each HA release
+      - dependency-name: pytest-homeassistant
